@@ -1,3 +1,4 @@
+const mysql = require("mysql2");
 module.exports = {
     forget: function (app, dic) {
         var code;
@@ -5,10 +6,21 @@ module.exports = {
         var check;
         var snaps;
         var checkCod;
+        var job;
+        const pool = mysql
+        .createPool({
+          host: "localhost",
+          user: "root",
+          password: "1234",
+          database: "project",
+        })
+        .promise();
         app.post("/forget", async (req, res) => {
             email = req.body.email;
             check = "";
             snaps = false;
+            email="hananalrstom594@gmail.com"
+            job="";
             if (job == "Dr") {
                 await pool
                     .query("SELECT * FROM doctor WHERE email = ?", [email])
@@ -47,9 +59,10 @@ module.exports = {
                         const transporter = nodemailer.createTransport({
                             host: "smtp.elasticemail.com", //
                             port: 2525,
+                            secure:false,
                             auth: {
                                 user: "hananalrstom87@gmail.com", // Your Ethereal Email address
-                                pass: "1980E59A59ABF2E83538525EF3B1FD9C1824", // Your Ethereal Email password
+                                pass: "2905B81434D93ECBB70ADB0ED728D89C8F03", // Your Ethereal Email password
                             },
                         }); // Send the email
                         let info = await transporter.sendMail({
