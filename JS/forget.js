@@ -7,6 +7,7 @@ module.exports = {
         var snaps;
         var checkCod;
         var job;
+        var newPass;
         const pool = mysql
         .createPool({
           host: "localhost",
@@ -14,7 +15,7 @@ module.exports = {
           password: "1234",
           database: "project",
         })
-        .promise();
+        const promisePool = pool.promise();
         app.post("/forget", async (req, res) => {
             email = req.body.email;
             check = "";
@@ -22,7 +23,7 @@ module.exports = {
             email="hananalrstom594@gmail.com"
             job="";
             if (job == "Dr") {
-                await pool
+                await promisePool
                     .query("SELECT * FROM doctor WHERE email = ?", [email])
                     .then(async ([rows]) => {
                         if (rows.length == 0) {
@@ -34,7 +35,7 @@ module.exports = {
                         console.error(error);
                     });
             } else {
-                await pool
+                await promisePool
                     .query("SELECT * FROM employee WHERE email = ?", [email])
                     .then(async ([rows]) => {
                         if (rows.length == 0) {
@@ -86,11 +87,31 @@ module.exports = {
 
             res.send("")
         })
-        app.post("/check", (req, res) => {
-            checkCod = req.body.code;
-            if (checkCod != code)
-                check = "incorrect code "
-        })
+        
+
+        
+ 
+          
+          app.post("/check", (req, res) => {
+            checkCod = code;
+            newPass = "6666";
+            if (checkCod != code) {
+              check = "incorrect code";
+            } else {
+              const sql = "UPDATE employee SET password = ? WHERE email = ?";
+              
+              // استخدام promisePool.query() لتنفيذ الاستعلام
+              promisePool.query(sql, [newPass, email])
+                .then(([results, fields]) => {
+                  console.log('Number of rows affected: ' + results.affectedRows);
+                })
+                .catch((error) => {
+                  throw error;
+                });
+            }
+          });
+          
+        
         app.get("/forget", (req, res) => {
             obj = {
                 code: code,
