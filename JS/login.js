@@ -28,24 +28,21 @@ module.exports = {
           .then(async ([rows]) => {
             if (rows.length > 0) {
               await pool
-                .query("SELECT * FROM doctor WHERE password = ?", [password])
+                .query("SELECT * FROM doctor WHERE password = ? and email = ?", [password, email])
                 .then(([rows]) => {
                   if (rows.length > 0) {
-                    console.log("yees pass");
+                    console.log(rows);
                   } else {
                     check = "password is incorrect";
-                    console.log("nooo pass");
                   }
                 })
                 .catch((error) => {
                   console.error(error);
                 });
 
-              console.log("yees");
             } else {
               check =
-                "The entered email id wrong or you do not have the authority to log in to this account";
-              console.log("nooo");
+                "The entered email is wrong or you do not have the authority to log in to this account";
             }
           })
           .catch((error) => {
@@ -56,12 +53,12 @@ module.exports = {
           .query("SELECT * FROM employee WHERE email = ?", [email])
           .then(async ([rows]) => {
             if (rows.length > 0) {
-              console.log("yees");
+              console.log(rows);
               await pool
-                .query("SELECT * FROM employee WHERE password = ?", [password])
+                .query("SELECT * FROM employee WHERE password = ? and email = ? ", [password, email])
                 .then(([rows]) => {
                   if (rows.length > 0) {
-                    console.log("yees pass");
+                    console.log(rows);
                   } else {
                     check = "password is incorrect";
                     console.log("nooo pass");
@@ -72,8 +69,7 @@ module.exports = {
                 });
             } else {
               check =
-                "The entered email id wrong or you do not have the authority to log in to this account";
-              console.log("nooo");
+                "The entered email is wrong or you do not have the authority to log in to this account";
             }
           })
           .catch((error) => {

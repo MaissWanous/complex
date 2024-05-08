@@ -7,23 +7,21 @@ module.exports = {
         var snaps;
         var checkCod;
         var job;
-        var newPass;
+        var password;
         const pool = mysql
-        .createPool({
-          host: "localhost",
-          user: "root",
-          password: "1234",
-          database: "project",
-        })
-        const promisePool = pool.promise();
+            .createPool({
+                host: "localhost",
+                user: "root",
+                password: "1234",
+                database: "project",
+            })
+            .promise();
         app.post("/forget", async (req, res) => {
             email = req.body.email;
             check = "";
             snaps = false;
-            email="hananalrstom594@gmail.com"
-            job="";
             if (job == "Dr") {
-                await promisePool
+                await pool
                     .query("SELECT * FROM doctor WHERE email = ?", [email])
                     .then(async ([rows]) => {
                         if (rows.length == 0) {
@@ -35,7 +33,7 @@ module.exports = {
                         console.error(error);
                     });
             } else {
-                await promisePool
+                await pool
                     .query("SELECT * FROM employee WHERE email = ?", [email])
                     .then(async ([rows]) => {
                         if (rows.length == 0) {
@@ -60,10 +58,9 @@ module.exports = {
                         const transporter = nodemailer.createTransport({
                             host: "smtp.elasticemail.com", //
                             port: 2525,
-                            secure:false,
                             auth: {
                                 user: "hananalrstom87@gmail.com", // Your Ethereal Email address
-                                pass: "2905B81434D93ECBB70ADB0ED728D89C8F03", // Your Ethereal Email password
+                                pass: "1980E59A59ABF2E83538525EF3B1FD9C1824", // Your Ethereal Email password
                             },
                         }); // Send the email
                         let info = await transporter.sendMail({
@@ -87,31 +84,18 @@ module.exports = {
 
             res.send("")
         })
-        
-
-        
- 
-          
-          app.post("/check", (req, res) => {
-            checkCod = code;
-            newPass = "6666";
-            if (checkCod != code) {
-              check = "incorrect code";
-            } else {
-              const sql = "UPDATE employee SET password = ? WHERE email = ?";
-              
-              // استخدام promisePool.query() لتنفيذ الاستعلام
-              promisePool.query(sql, [newPass, email])
-                .then(([results, fields]) => {
-                  console.log('Number of rows affected: ' + results.affectedRows);
-                })
-                .catch((error) => {
-                  throw error;
-                });
-            }
-          });
-          
-        
+        app.post("/check", (req, res) => {
+            checkCod = req.body.code;
+            if (checkCod != code)
+                check = "incorrect code "
+            console.log(check)
+            res.send();
+        })
+        app.post("/resetPass", (req, res) => {
+            password = req.body.password;
+            pool.query("UPDATE employee SET password = ? WHERE email = ? ", [password, email])
+            res.send();
+        })
         app.get("/forget", (req, res) => {
             obj = {
                 code: code,

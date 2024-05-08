@@ -7,17 +7,25 @@
 </head>
 <body>
     <form action="/login" method="post">
-        <input type="email" name="email" id="email">
+        <p>login</p>
+        <input type="email" name="email" title="email">
         <input type="password" name="password" id="password">
         <input type="submit" value="submit">
     </form>
     <form action="/forget" method="post">
+        <div>forget</div>
+        <input type="email" name="email" title="email">
       
         <input type="submit" value="submit">
     </form>
     <form action="/check" method="post">
-      
+      <input type="text" name="code" title="check code">
         <input type="submit" value="sub">
     </form>
+    <form action="/resetPass" method="post">
+        <div>set password</div>
+        <input type="text" name="password" title="password">
+          <input type="submit" value="sub">
+      </form>
 </body>
 </html>
