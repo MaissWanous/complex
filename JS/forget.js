@@ -93,7 +93,11 @@ module.exports = {
         })
         app.post("/resetPass", (req, res) => {
             password = req.body.password;
-            pool.query("UPDATE employee SET password = ? WHERE email = ? ", [password, email])
+            var table ;
+            if (job=="Dr") 
+                table="doctor";
+             else table="employee";
+            pool.query("UPDATE ? SET password = ? WHERE email = ? ", [table,password, email])
             res.send();
         })
         app.get("/forget", (req, res) => {
