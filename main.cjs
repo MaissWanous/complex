@@ -37,6 +37,14 @@ import('./JS/login.js')
   .catch((err) => {
     console.error(err);
   });
+  
+import('./JS/reseption.js')
+.then((reseption) => {
+  reseption.reseption(app, __dirname);
+})
+.catch((err) => {
+  console.error(err);
+});
 app.use(cors());
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({ extended: false }));
