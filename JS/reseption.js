@@ -19,6 +19,7 @@ module.exports = {
         app.post("/appointment", (req, res) => {
             doctor_id = req.body.doctor_id;
             date = req.body.date;
+
         })
         var patients_data;
         var partient;
@@ -42,28 +43,106 @@ module.exports = {
             res.json({ available_hours: available_hours })
         })
 
-        function deleteAppointment(patientId, doctorId, appointmentDate, time) {
-            const sql = 'DELETE FROM appointment WHERE patient_id =? AND doctor_id =? AND date =? AND start_hour=?';
-            return pool.query(sql, [patientId, doctorId, appointmentDate, time]);
-        }
+    function deleteAppointment(patientId, doctorId, appointmentDate, time) {
+      const sql =
+        "DELETE FROM appointment WHERE patient_id =? AND doctor_id =? AND date =? AND start_hour=?";
+      return pool.query(sql, [patientId, doctorId, appointmentDate, time]);
+    }
 
         app.delete("/appointments/:patientId/:doctorId/:date/:time", function (req, res) {
-            const patientId = req.parms.patientId;
-            const doctorId = req.parms.doctorId;
-            const appointmentDate = req.parms.date;
-            const time = req.parms.time;
+            const patientId = req.body.patientId;
+            const doctorId = req.body.doctorId;
+            const appointmentDate = req.body.date;
+            const time = req.body.time;
 
-            deleteAppointment(patientId, doctorId, appointmentDate, time, (err, result) => {
-                if (err) {
-                    console.error(err);
-                    res.status(500).send("error");
-                } else {
-                    res.send("error");
-                }
-            });
+        deleteAppointment(
+          patientId,
+          doctorId,
+          appointmentDate,
+          time,
+          (err, result) => {
+            if (err) {
+              console.error(err);
+              res.status(500).send("error");
+            } else {
+              res.send("error");
+            }
+          }
+        );
+      }
+    );
+    app.post("/addAppointment", function (req, res) {
+      const startHour = req.body.startHour;
+      const doctor_id = req.body.doctor_id;
+      const date = req.body.date;
+
+      async function calculateEndTime(startHour) {
+        const [startHourPart, startMinutePart] = startHour.split(":");
+        const startHourNumber = parseInt(startHourPart);
+        const startMinuteNumber = parseInt(startMinutePart);
+
+        const endTimeMinutes = startMinuteNumber + 30;
+        const endTimeHour = startHourNumber + Math.floor(endTimeMinutes / 60);
+        const endTimeMinute = endTimeMinutes % 60;
+        const endTimeString = `${endTimeHour
+          .toString()
+          .padStart(2, "0")}:${endTimeMinute.toString().padStart(2, "0")}`;
+
+        return endTimeString;
+      }
+
+      async function createAppointment() {
+        try {
+          const endTime = await calculateEndTime(startHour);
+          console.log(`end time : ${endTime}`);
+
+          const sql =
+            "INSERT INTO appointment (patient_id, doctor_id, date, start_hour, end_hour) VALUES (?, ?, ?, ?, ?)";
+          pool.query(
+            sql,
+            [patient_id, doctor_id, date, startHour, endTime],
+            (error, results, fields) => {
+              if (error) {
+                console.error(error);
+                return;
+              }
+              console.log(`Inserted ${results.affectedRows} row(s)`);
+            }
+          );
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      createAppointment();
+
+      res.send();
+    });
+
+    ////////////////////////////////////
+    //query for employee information
+    app.get("/employee_info", async (req, res) => {
+      try {
+        const employeeId = req.body.employee_id; 
+        const query =
+          "SELECT fname, lname, sex, email, phone, birth_date, address, password, job_title, salary FROM employee WHERE id = ?";
+    
+        const [results] = await pool.query(query, [employeeId]);
+    
+        if (results.length === 0) {
+          return res.status(404).json({ error: "No employee found with this ID." });
+        }
+    
+        const employee = results[0];
+        console.log(employee);
+        return res.json(employee);
+      } catch (error) {
+        console.error("Error executing the query:", error);
+        return res.status(500).json({
+          error: "An error occurred while fetching the employee information.",
         });
-
-
-
-    },
+      }
+    });
+  
+  },
 };
