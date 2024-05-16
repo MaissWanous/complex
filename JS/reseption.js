@@ -19,7 +19,6 @@ module.exports = {
         app.post("/appointment", (req, res) => {
             doctor_id = req.body.doctor_id;
             date = req.body.date;
-
         })
         var patients_data;
         var partient;
@@ -49,10 +48,10 @@ module.exports = {
         }
 
         app.delete("/appointments/:patientId/:doctorId/:date/:time", function (req, res) {
-            const patientId = req.body.patientId;
-            const doctorId = req.body.doctorId;
-            const appointmentDate = req.body.date;
-            const time = req.body.time;
+            const patientId = req.parms.patientId;
+            const doctorId = req.parms.doctorId;
+            const appointmentDate = req.parms.date;
+            const time = req.parms.time;
 
             deleteAppointment(patientId, doctorId, appointmentDate, time, (err, result) => {
                 if (err) {
