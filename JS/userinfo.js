@@ -23,6 +23,7 @@ module.exports = {
     let userId;
     let userInfo;
     let userPayment;
+    let error;
     app.post("/login", async function (req, res) {
       email = req.body.email;
       password = req.body.password;
@@ -184,23 +185,38 @@ module.exports = {
       };
       res.JSON(obj);
     });
+    ////////////////////////////////////
+    //query for user information
     app.get("/userInfo", async (req, res) => {
-      if (job == "Dr") {
-        userInfo = await pool
-          .query("SELECT * FROM doctor WHERE email = ?", [email])
-        userPayment = await pool
-          .query("SELECT * FROM salaries WHERE user_id = ? and is_doctor = 1", [userId])
-      } else {
-        userInfo = await pool
-          .query("SELECT * FROM employee WHERE email = ?", [email])
-        userPayment = await pool
-          .query("SELECT * FROM salaries WHERE user_id = ? and is_doctor = 0", [userId])
-      }
+      try {
+        if (job == "Dr") {
+          userInfo = await pool
+            .query("SELECT * FROM doctor WHERE email = ?", [email])
+          userPayment = await pool
+            .query("SELECT * FROM salaries WHERE user_id = ? and is_doctor = 1", [userId])
+        } else {
+          userInfo = await pool
+            .query("SELECT * FROM employee WHERE email = ?", [email])
+          userPayment = await pool
+            .query("SELECT * FROM salaries WHERE user_id = ? and is_doctor = 0", [userId])
+        }
+        if (userInfo.length === 0) {
+          return res.status(404).json({ error: "No employee found with this ID." });
+        }
 
-      res.json({
-        userInfo: userInfo,
-        userPayment: userPayment
-      })
+
+        res.json({
+          userInfo: userInfo,
+          userPayment: userPayment,
+          error: error
+        })
+      }
+      catch (error) {
+        console.error("Error executing the query:", error);
+        return res.status(500).json({
+          error: "An error occurred while fetching the employee information.",
+        });
+      }
     })
   },
 };
