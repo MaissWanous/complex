@@ -138,5 +138,31 @@ module.exports = {
 
       res.send();
     });
+
+    ////////////////////////////////////
+    //query for employee information
+    app.get("/employee_info", async (req, res) => {
+      try {
+        const employeeId = req.body.employee_id; 
+        const query =
+          "SELECT fname, lname, sex, email, phone, birth_date, address, password, job_title, salary FROM employee WHERE id = ?";
+    
+        const [results] = await pool.query(query, [employeeId]);
+    
+        if (results.length === 0) {
+          return res.status(404).json({ error: "No employee found with this ID." });
+        }
+    
+        const employee = results[0];
+        console.log(employee);
+        return res.json(employee);
+      } catch (error) {
+        console.error("Error executing the query:", error);
+        return res.status(500).json({
+          error: "An error occurred while fetching the employee information.",
+        });
+      }
+    });
+  
   },
 };
