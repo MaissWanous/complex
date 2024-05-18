@@ -38,9 +38,9 @@ import('./JS/login.js')
     console.error(err);
   });
   
-import('./JS/reseption.js')
-.then((reseption) => {
-  reseption.reseption(app, __dirname);
+import('./JS/reception.js')
+.then((reception) => {
+  reception.reception(app, __dirname);
 })
 .catch((err) => {
   console.error(err);
