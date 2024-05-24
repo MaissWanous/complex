@@ -53,7 +53,7 @@ module.exports = {
       });
     });
 
-    // Handle GET request for appointment endpoint
+    // obtaining the appointments available to the chosen doctor
     app.get("/appointment", async (req, res) => {
       let busyHours = await pool.query(
         "SELECT start_hour, end_hour FROM appointment WHERE doctor_id = ? AND date = ?",
@@ -111,7 +111,7 @@ module.exports = {
       const startHour = req.body.startHour;
       const doctor_id = req.body.doctor_id;
       const date = req.body.date;
-
+      // booking half an hour
       async function calculateEndTime(startHour) {
         const [startHourPart, startMinutePart] = startHour.split(":");
         const startHourNumber = parseInt(startHourPart);
@@ -154,6 +154,8 @@ module.exports = {
 
       res.send();
     });
+
+    // add new patient 
     app.post("/addPatient", function (req, res) {
       let patient_id = req.body.patient_id;
       let fname = req.body.fname;
@@ -177,6 +179,7 @@ module.exports = {
       );
       res.send();
     });
+    //get treatment info for patient
     app.get("/treatmentInfo", function (req, res) {
       let treatmentInfo = pool.query(
         "select * from treatment_info,treatment where treatment.treatment_id=treatment_info.treatment_id AND patient_id = ?",

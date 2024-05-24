@@ -1,6 +1,6 @@
 const mysql = require("mysql2");
 module.exports = {
-  login: function (app, dic) {
+  userInfo: function (app, dic) {
     // Endpoint to serve the login HTML file
     app.get("/login", function (req, res) {
       res.sendFile(dic + "/HTML/login.html");

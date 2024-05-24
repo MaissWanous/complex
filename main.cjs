@@ -25,10 +25,10 @@ const promisePool = pool.promise();
 // Export the promise pool for use in other modules
 module.exports = promisePool;
 
-// Import and use login module
-import('./JS/login.js')
-  .then((login) => {
-    login.login(app, __dirname);
+// Import and use userInfo module
+import('./JS/userInfo.js')
+  .then((userInfo) => {
+    userInfo.userInfo(app, __dirname);
   })
   .catch((err) => {
     console.error(err);
