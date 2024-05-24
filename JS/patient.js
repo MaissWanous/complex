@@ -1,65 +1,80 @@
 const { add } = require("lodash");
 const mysql = require("mysql2");
 module.exports = {
-  reception: function (app, dic) {
-    const pool = mysql
-      .createPool({
-        host: "localhost",
-        user: "root",
-        password: "1234",
-        database: "project",
-      })
-      .promise();
-    let patient_id;
-    let doctor_id;
-    let date;
+  patient: function (app, dic) {
+    // Create a connection pool for MySQL database
+    const pool = mysql.createPool({
+      host: "localhost",
+      user: "root",
+      password: "1234",
+      database: "project",
+    }).promise();
+
+    let patientId;
+    let doctorId;
+    let appointmentDate;
+
+    // Handle POST request for patient endpoint
     app.post("/patient", (req, res) => {
-      patient_id = req.body.Pid;
+      patientId = req.body.Pid;
       res.send();
     });
+
+    // Handle POST request for appointment endpoint
     app.post("/appointment", (req, res) => {
-      doctor_id = req.body.doctor_id;
-      date = req.body.date;
+      doctorId = req.body.doctor_id;
+      appointmentDate = req.body.date;
+      res.send();
     });
-    let patients_data;
-    let patient;
-    let appointment;
-    app.get("/patient", (req, res) => {
-      patients_data = pool.query(
-        "SELECT patient.fname, patient.lname, doctor.fname, doctor.lname, patient.id, date, start_hour FROM patient, appointment, doctor WHERE patient.id = patient_id"
+
+    let patientsData;
+    let patientInfo;
+    let appointmentInfo;
+
+    // Handle GET request for patient endpoint
+    app.get("/patient", async (req, res) => {
+      // Retrieve patient, doctor, and appointment data from the database
+      patientsData = await pool.query(
+        "SELECT patient.fname, patient.lname, doctor.fname, doctor.lname, patient.id, date, start_hour FROM patient, appointment, doctor WHERE patient.id = ?",
+        [patientId]
       );
-      patient = pool.query("select * from patient where patient_id = ?", [
-        patient_id,
+      patientInfo = await pool.query("SELECT * FROM patient WHERE id = ?", [
+        patientId,
       ]);
-      appointment = pool.query(
-        "select patient_id , date , start_hour fname,lname from appointment, doctor where doctor_id=id and patient_id =?",
-        [patient_id]
+      appointmentInfo = await pool.query(
+        "SELECT patient_id, date, start_hour, fname, lname FROM appointment, doctor WHERE doctor_id = id AND patient_id = ?",
+        [patientId]
       );
 
       res.json({
-        patients_data: patients_data,
-        patient: patient,
-        appointment: appointment,
+        patientsData: patientsData,
+        patientInfo: patientInfo,
+        appointmentInfo: appointmentInfo,
       });
     });
-    app.get("/appointment", (req, res) => {
-      let busy_hours = pool.query(
-        "select start_houre, end_houre from appointment where dotor_id=? date=?",
-        [doctor_id, date]
+
+    // Handle GET request for appointment endpoint
+    app.get("/appointment", async (req, res) => {
+      let busyHours = await pool.query(
+        "SELECT start_hour, end_hour FROM appointment WHERE doctor_id = ? AND date = ?",
+        [doctorId, appointmentDate]
       );
-      let all_hours = [];
+
+      let allHours = [];
       for (let hour = 8; hour <= 21; hour++) {
-        all_hours.push(hour + ":00");
-        all_hours.push(hour + ":30");
+        allHours.push(hour + ":00");
+        allHours.push(hour + ":30");
       }
-      let available_hours = all_hours.filter(
+
+      let availableHours = allHours.filter(
         (hour) =>
-          !busy_hours.some(
-            (busy_hour) =>
-              busy_hour.start_hour <= hour && busy_hour.end_hour > hour
+          !busyHours.some(
+            (busyHour) =>
+              busyHour.start_hour <= hour && busyHour.end_hour > hour
           )
       );
-      res.json({ available_hours: available_hours });
+
+      res.json({ availableHours: availableHours });
     });
 
     function deleteAppointment(patientId, doctorId, appointmentDate, time) {

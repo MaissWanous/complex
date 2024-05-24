@@ -1,14 +1,14 @@
-const mysql = require('mysql2');
-
+// Import required libraries
 const express = require('express');
 const fileUpload = require('express-fileupload');
 const cors = require('cors');
-const _ = require('lodash');
 const bodyParser = require('body-parser');
+const mysql = require('mysql2'); 
 
+// Create an instance of Express app
 const app = express();
 
-
+// Create a MySQL connection pool
 const pool = mysql.createPool({
   host: 'localhost',
   user: 'root',
@@ -19,10 +19,13 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+// Create a promise-based wrapper for the pool
 const promisePool = pool.promise();
 
+// Export the promise pool for use in other modules
 module.exports = promisePool;
 
+// Import and use login module
 import('./JS/login.js')
   .then((login) => {
     login.login(app, __dirname);
@@ -30,30 +33,37 @@ import('./JS/login.js')
   .catch((err) => {
     console.error(err);
   });
-  import('./JS/forget.js')
+
+// Import and use forget module
+import('./JS/forget.js')
   .then((forget) => {
     forget.forget(app, __dirname);
   })
   .catch((err) => {
     console.error(err);
   });
-  
-import('./JS/reception.js')
-.then((reception) => {
-  reception.reception(app, __dirname);
-})
-.catch((err) => {
-  console.error(err);
-});
+
+// Import and use patient module
+import('./JS/patient.js')
+  .then((patient) => {
+    patient.patient(app, __dirname);
+  })
+  .catch((err) => {
+    console.error(err);
+  });
+
+// Set up middleware
 app.use(cors());
 app.use(fileUpload());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
+// Define a route to serve the login page
 app.get('/', function (req, res) {
-    res.sendFile(__dirname + '/HTML/login.html');
+  res.sendFile(__dirname + '/HTML/login.html');
 });
 
-app.listen(8084, function (req, res) {
-    console.log('server started on port 8084');
+// Start the server on port 8084
+app.listen(8084, function () {
+  console.log('Server started on port 8084');
 });
