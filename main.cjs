@@ -35,9 +35,9 @@ import('./JS/userInfo.js')
   });
 
 // Import and use forget module
-import('./JS/forget.js')
-  .then((forget) => {
-    forget.forget(app, __dirname);
+import('./JS/invoice.js')
+  .then((admin) => {
+    admin.admin(app, __dirname);
   })
   .catch((err) => {
     console.error(err);
