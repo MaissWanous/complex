@@ -10,31 +10,23 @@ module.exports = {
         host: "localhost",
         user: "root",
         password: "1234",
-        database: "project",
+        database: "complex",
       })
       .promise();
 
-    app.post("/AddSuppliers", function (req, res) {
-      let labId = req.body.id;
+    app.post("/AddSuppliers", async function (req, res) {
       let labName = req.body.name;
       let labAddress = req.body.address;
       let number1 = req.body.number1;
       let number2 = req.body.number2;
       let number3 = req.body.number3;
+
       //add new laboratory
-      const labInfo =
-        "INSERT INTO suppliers (lab_id,lab_name,address) VALUES (?,?,?)";
-      pool.query(
-        labInfo,
-        [labId, labName, labAddress],
-        (error, results, fields) => {
-          if (error) {
-            console.error(error);
-            return;
-          }
-          console.log(`Inserted ${results.affectedRows} row(s)`);
-        }
-      );
+      const labInfo = "INSERT INTO suppliers (lab_name,address) VALUES (?,?)";
+      const labInsertResult = await pool.query(labInfo, [labName, labAddress]);
+      // get the auto-generated value
+      const labResult = await pool.query("SELECT LAST_INSERT_ID() as lab_id");
+      let labId = await labResult[0][0].lab_id;
 
       //add laboratory's phone
       if (number1 !== "" && number2 !== "" && number3 !== "") {
@@ -116,30 +108,26 @@ module.exports = {
 
       res.send();
     });
-    //to delete laboratory
-    app.delete("/labs/:id", async (req, res) => {
-      const labId = req.params.id;
-      async function deleteLabById(labId) {
-        try {
-          // Use the MySQL pool to execute the delete query
-          await pool.query("DELETE FROM labs WHERE id = ?", [labId]);
-          return true; // Return success
-        } catch (err) {
-          console.error(err);
-          return false; // Return failure
-        }
-      }
-      try {
-        const result = await deleteLabById(labId);
-        if (result) {
-          res.send("Lab deleted successfully");
-        } else {
-          res.status(500).send("Error deleting lab");
-        }
-      } catch (err) {
-        console.error(err);
-        res.status(500).send("Error deleting lab");
-      }
-    });
-  },
-};
+    // add inovice 
+    let lab_id;
+    let date;
+    app.post("/startInvoice", (req, res) => {
+      lab_id = req.body.labId;
+      date = req.body.date;
+      res.send()
+    })
+    app.post("/addInvoice", (req, res) => {
+      let inovice = req.body["arr"];
+      console.log(inovice);
+      // inovice.forEach(item => {
+      //   const query = "INSERT INTO invoice (lab_id,date, amount, piece_cost, note) VALUES (?,?,?,?,?)"
+      //   pool.query(query, [lab_id, date, '${item.amount}', '${item.price}', '${item.note}']
+      //     , (error, results, fields) => {
+      //       if (error) throw error;
+      //       console.log('Data inserted successfully');
+      //     });
+      // });
+      res.send();
+    })
+  }
+}
