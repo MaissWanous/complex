@@ -116,17 +116,18 @@ module.exports = {
       date = req.body.date;
       res.send()
     })
+    lab_id=1;
     app.post("/addInvoice", (req, res) => {
-      let inovice = req.body["arr"];
-      console.log(inovice);
-      // inovice.forEach(item => {
-      //   const query = "INSERT INTO invoice (lab_id,date, amount, piece_cost, note) VALUES (?,?,?,?,?)"
-      //   pool.query(query, [lab_id, date, '${item.amount}', '${item.price}', '${item.note}']
-      //     , (error, results, fields) => {
-      //       if (error) throw error;
-      //       console.log('Data inserted successfully');
-      //     });
-      // });
+      let invoice = req.body;
+      console.log(invoice);
+      invoice.forEach(item => {
+        const query = "INSERT INTO invoice (lab_id, date, amount, piece_cost, note) VALUES (?, ?, ?, ?, ?)";
+        pool.query(query, [lab_id, date, parseInt(item.amount), parseInt(item.price), item.note], (error, results, fields) => {
+          if (error) throw error;
+          console.log('Data inserted successfully');
+        });
+      });
+      
       res.send();
     })
   }
