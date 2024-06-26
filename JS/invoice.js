@@ -108,7 +108,7 @@ module.exports = {
 
       res.send();
     });
-    // add inovice 
+   //start add new invoice
     let lab_id;
     let date;
     app.post("/startInvoice", (req, res) => {
@@ -116,19 +116,57 @@ module.exports = {
       date = req.body.date;
       res.send()
     })
-    lab_id=1;
+    //add invoice
     app.post("/addInvoice", (req, res) => {
       let invoice = req.body;
-      console.log(invoice);
-      invoice.forEach(item => {
-        const query = "INSERT INTO invoice (lab_id, date, amount, piece_cost, note) VALUES (?, ?, ?, ?, ?)";
-        pool.query(query, [lab_id, date, parseInt(item.amount), parseInt(item.price), item.note], (error, results, fields) => {
+
+      invoice.forEach(async item => {
+        let i = typeof (item.item);
+        let itemId;
+        if (i == "number")
+          itemId = parseInt(item.item);
+        else {
+          await pool.query("insert into items (item) values (?) ", [item.item]);
+          const itemResult = await pool.query("SELECT LAST_INSERT_ID() as itemId");
+          itemId = await parseInt(itemResult[0][0].itemId);
+        }
+        const query = "INSERT INTO invoice (lab_id, date , item_id , amount , piece_cost, note) VALUES (?,?, ?, ?, ?, ?)";
+        pool.query(query, [lab_id, date, itemId, parseInt(item.amount), parseInt(item.price), item.note], (error, results, fields) => {
           if (error) throw error;
-          console.log('Data inserted successfully');
+          else console.log('Data inserted successfully');
         });
+        pool.query("update items set amount = amount + ? where item_id = ?", [parseInt(item.amount), itemId])
       });
-      
+
       res.send();
     })
+
+    //Get info about invoice and items
+    app.get("/invoiceInfo", async (req, res) => {
+      try {
+
+        let query = `
+     	SELECT item, lab_name, address, date, i.amount, i.piece_cost, note, sp.phone
+      FROM invoice AS i
+     JOIN items ON i.item_id = items.item_id
+     JOIN suppliers AS s ON i.lab_id = s.lab_id
+      LEFT JOIN suppliers_phone AS sp ON s.lab_id = sp.lab_id;
+    `;
+        const items = await pool.query("select * from items");
+        const labInfo = await pool.query("select * from suppliers as s , suppliers_phone as sph where s.lab_id = sph.lab_id");
+        const inovice = await pool.query(query)
+        const obj = {
+          items,
+          labInfo,
+          inovice
+        };
+        res.json(obj);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Error retrieving invoice data"); // Handle errors gracefully
+      }
+    });
+
+
   }
 }
