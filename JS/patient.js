@@ -33,7 +33,7 @@ module.exports = {
 
     // Handle GET request for patient endpoint
     app.get("/patient", async (req, res) => {
-      // Retrieve patient, doctor, and appointment data from the database
+      // Retrieve patient, doctor, and appointment data from the database for patient info
       patientsData = await pool.query(
         "SELECT patient.fname, patient.lname, doctor.fname, doctor.lname, patient.id, date, start_hour FROM patient, appointment, doctor WHERE patient.id = ?",
         [patientId]

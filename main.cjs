@@ -3,7 +3,7 @@ const express = require('express');
 const fileUpload = require('express-fileupload');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const mysql = require('mysql2'); 
+const mysql = require('mysql2');
 
 // Create an instance of Express app
 const app = express();

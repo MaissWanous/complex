@@ -5,110 +5,43 @@ module.exports = {
     app.get("/admin", function (req, res) {
       res.sendFile(dic + "/HTML/login.html");
     });
-    const pool = mysql
-      .createPool({
-        host: "localhost",
-        user: "root",
-        password: "1234",
-        database: "complex",
-      })
-      .promise();
-
-    app.post("/AddSuppliers", async function (req, res) {
-      let labName = req.body.name;
-      let labAddress = req.body.address;
-      let number1 = req.body.number1;
-      let number2 = req.body.number2;
-      let number3 = req.body.number3;
-
-      //add new laboratory
-      const labInfo = "INSERT INTO suppliers (lab_name,address) VALUES (?,?)";
-      const labInsertResult = await pool.query(labInfo, [labName, labAddress]);
-      // get the auto-generated value
-      const labResult = await pool.query("SELECT LAST_INSERT_ID() as lab_id");
-      let labId = await labResult[0][0].lab_id;
-
-      //add laboratory's phone
-      if (number1 !== "" && number2 !== "" && number3 !== "") {
-        const sql = `
-          INSERT INTO suppliers_phone (lab_id, phone)
-          VALUES (?, ?), (?, ?), (?, ?)
-        `;
-
-        pool.query(
-          sql,
-          [labId, number1, labId, number2, labId, number3],
-          (error, results, fields) => {
-            if (error) {
-              console.error(error);
-              return;
-            }
-            console.log(`Inserted ${results.affectedRows} row(s)`);
-          }
-        );
-      }
-
-      let nonEmptyNumbers = [];
-      if (number1 !== "") {
-        nonEmptyNumbers.push(number1);
-      }
-      if (number2 !== "") {
-        nonEmptyNumbers.push(number2);
-      }
-      if (number3 !== "") {
-        nonEmptyNumbers.push(number3);
-      }
-
-      if (nonEmptyNumbers.length === 2) {
-        const sql = `
-    INSERT INTO suppliers_phone (lab_id, phone)
-    VALUES ${nonEmptyNumbers.map(() => "(?, ?)").join(", ")}
-  `;
-
-        const values = nonEmptyNumbers.reduce(
-          (acc, curr) => [...acc, labId, curr],
-          []
-        );
-
-        pool.query(sql, values, (error, results, fields) => {
-          if (error) {
-            console.error(error);
-            return;
-          }
-          console.log(`Inserted ${results.affectedRows} row(s)`);
-        });
-      }
-      let nonEmptyNumbers2 = [];
-      if (number1 !== "") {
-        nonEmptyNumbers2.push(number1);
-      }
-      if (number2 !== "") {
-        nonEmptyNumbers2.push(number2);
-      }
-      if (number3 !== "") {
-        nonEmptyNumbers2.push(number3);
-      }
-
-      if (nonEmptyNumbers2.length === 1) {
-        const sql = `
-    INSERT INTO suppliers_phone (lab_id, phone)
-    VALUES (?, ?)`;
-        pool.query(
-          sql,
-          [labId, nonEmptyNumbers2[0]],
-          (error, results, fields) => {
-            if (error) {
-              console.error(error);
-              return;
-            }
-            console.log(`Inserted ${results.affectedRows} row(s)`);
-          }
-        );
-      }
-
-      res.send();
+    // Create a dedicated connection pool for the application
+    const pool = mysql.createPool({
+      host: "localhost",
+      user: "root",
+      password: "1234",
+      database: "complex",
     });
-   //start add new invoice
+    // Add supplier
+    app.post("/AddSuppliers", async function (req, res) {
+      try {
+        const { name, address, number1, number2, number3 } = req.body;
+
+        // Insert laboratory details
+        const labInsertResult = await pool.query(
+          "INSERT INTO suppliers (lab_name, address) VALUES (?, ?)",
+          [name, address]
+        );
+        const labId = labInsertResult[0].insertId;
+
+        // Insert phone numbers (if provided)
+        const phoneNumbers = [number1, number2, number3].filter(Boolean); // Remove empty values
+        if (phoneNumbers.length > 0) {
+          const sql = `
+            INSERT INTO suppliers_phone (lab_id, phone)
+            VALUES ${phoneNumbers.map(() => "(?, ?)").join(", ")}
+          `;
+          await pool.query(sql, phoneNumbers.flatMap((number) => [labId, number]));
+        }
+
+        res.send();
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Error adding supplier");
+      }
+    });
+
+    //start add new invoice
     let lab_id;
     let date;
     app.post("/startInvoice", (req, res) => {
@@ -141,16 +74,60 @@ module.exports = {
       res.send();
     })
 
+
+    // delete invoice
+    app.delete("/invoice/:id/:date", async (req, res) => {
+      const labId = req.params.id;
+      const date = req.params.date;
+      console.log(`Deleting invoice: labId=${labId}, date=${date}`); // Improved logging
+
+      try {
+        // Use a transaction to ensure data consistency
+        await pool.query("BEGIN");
+
+        // Fetch invoice details to validate existence and get item amounts
+        const invoice = await pool.query(
+          "SELECT item_id, amount FROM invoice WHERE lab_id = ? AND date = ?",
+          [parseInt(labId), date]
+        );
+
+        if (invoice[0].length === 0) {
+          throw new Error("Invoice not found"); // Handle non-existent invoice
+        }
+
+        // Delete the invoice
+        await pool.query("DELETE FROM invoice WHERE lab_id = ? AND date = ?", [parseInt(labId), date]);
+
+        // Update item amounts
+        const updatePromises = invoice[0].map(async (item) => {
+          return pool.query("UPDATE items SET amount = amount - ? WHERE item_id = ?", [
+            parseInt(item.amount),
+            parseInt(item.item_id),
+          ]);
+        });
+
+        await Promise.all(updatePromises); // Execute item updates in parallel
+
+        await pool.query("COMMIT"); // Commit the transaction
+        res.send("Invoice deleted successfully");
+      } catch (err) {
+        console.error(err);
+        await pool.query("ROLLBACK"); // Roll back on errors
+        res.status(500).send("Error deleting invoice");
+      }
+    });
+
+
     //Get info about invoice and items
     app.get("/invoiceInfo", async (req, res) => {
       try {
 
         let query = `
-     	SELECT item, lab_name, address, date, i.amount, i.piece_cost, note, sp.phone
-      FROM invoice AS i
-     JOIN items ON i.item_id = items.item_id
-     JOIN suppliers AS s ON i.lab_id = s.lab_id
-      LEFT JOIN suppliers_phone AS sp ON s.lab_id = sp.lab_id;
+      	SELECT item, lab_name, address, date, i.amount, i.piece_cost, note, sp.phone
+        FROM invoice AS i
+        JOIN items ON i.item_id = items.item_id
+        JOIN suppliers AS s ON i.lab_id = s.lab_id
+        LEFT JOIN suppliers_phone AS sp ON s.lab_id = sp.lab_id;
     `;
         const items = await pool.query("select * from items");
         const labInfo = await pool.query("select * from suppliers as s , suppliers_phone as sph where s.lab_id = sph.lab_id");
