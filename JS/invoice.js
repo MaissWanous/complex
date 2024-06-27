@@ -6,12 +6,14 @@ module.exports = {
       res.sendFile(dic + "/HTML/login.html");
     });
     // Create a dedicated connection pool for the application
-    const pool = mysql.createPool({
-      host: "localhost",
-      user: "root",
-      password: "1234",
-      database: "complex",
-    });
+    const pool = mysql
+      .createPool({
+        host: "localhost",
+        user: "root",
+        password: "1234",
+        database: "complex",
+      })
+      .promise();
     // Add supplier
     app.post("/AddSuppliers", async function (req, res) {
       try {
@@ -41,39 +43,51 @@ module.exports = {
       }
     });
 
-    //start add new invoice
-    let lab_id;
-    let date;
+    // Start new invoice (store lab ID and date)
+    let currentLabId, currentDate;
     app.post("/startInvoice", (req, res) => {
-      lab_id = req.body.labId;
-      date = req.body.date;
-      res.send()
-    })
-    //add invoice
-    app.post("/addInvoice", (req, res) => {
-      let invoice = req.body;
-
-      invoice.forEach(async item => {
-        let i = typeof (item.item);
-        let itemId;
-        if (i == "number")
-          itemId = parseInt(item.item);
-        else {
-          await pool.query("insert into items (item) values (?) ", [item.item]);
-          const itemResult = await pool.query("SELECT LAST_INSERT_ID() as itemId");
-          itemId = await parseInt(itemResult[0][0].itemId);
-        }
-        const query = "INSERT INTO invoice (lab_id, date , item_id , amount , piece_cost, note) VALUES (?,?, ?, ?, ?, ?)";
-        pool.query(query, [lab_id, date, itemId, parseInt(item.amount), parseInt(item.price), item.note], (error, results, fields) => {
-          if (error) throw error;
-          else console.log('Data inserted successfully');
-        });
-        pool.query("update items set amount = amount + ? where item_id = ?", [parseInt(item.amount), itemId])
-      });
-
+      currentLabId = req.body.labId;
+      currentDate = req.body.date;
       res.send();
-    })
+    });
 
+    // Add invoice items
+    app.post("/addInvoice", async (req, res) => {
+      try {
+        const invoiceItems = req.body;
+
+        await Promise.all(
+          invoiceItems.map(async (item) => {
+            let itemId;
+            if (typeof item.item === "number") {
+              itemId = item.item;
+            } else {
+              const insertResult = await pool.query(
+                "insert into items (item) values (?) ",
+                [item.item]
+              );
+              itemId = insertResult[0].insertId;
+            }
+
+            await pool.query(
+              "INSERT INTO invoice (lab_id, date , item_id , amount , piece_cost, note) VALUES (?,?, ?, ?, ?, ?)",
+              [currentLabId, currentDate, itemId, parseInt(item.amount), parseInt(item.price), item.note]
+            );
+
+            // Update item amount (assuming items table has an "amount" column)
+            await pool.query(
+              "update items set amount = amount + ? where item_id = ?",
+              [parseInt(item.amount), itemId]
+            );
+          })
+        );
+
+        res.send("Invoice added successfully");
+      } catch (error) {
+        console.error(error);
+        res.status(500).send("Error adding invoice");
+      }
+    });
 
     // delete invoice
     app.delete("/invoice/:id/:date", async (req, res) => {
