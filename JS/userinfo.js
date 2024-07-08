@@ -22,13 +22,12 @@ module.exports = {
         let user; // Declare a variable to hold the retrieved user data
         let Job = job === 'Dr' ? "doctor" : "employee";
         user = await pool.query('SELECT * FROM ?? WHERE email = ?', [Job, email]);
-        if (!user.length) {
-          return res.status(401).send({ message: 'Invalid email or job type' });
+        if (!user[0].length) {
+          return res.status(401).send({ message: 'Invalid email ' });
         }
 
         const isPasswordCorrect = await pool.query('SELECT * FROM ?? WHERE password = ? AND email = ?', [Job, password, email]);
-
-        if (!isPasswordCorrect.length) {
+        if (!isPasswordCorrect[0].length) {
           return res.status(401).send({ message: 'Incorrect password' });
         }
         // Successful login: Generate JWT 
@@ -52,7 +51,7 @@ module.exports = {
         }
 
         // Verify the token using your secret key
-        jwt.verify(token, process.env.JWT_SECRET);
+        jwt.verify(token, "~u3!2t&zT^7z2X4yH^z9z2n^5n8s7z5z8z2z9n8z2n7z9z8z8");
 
 
         res.send({ message: 'Logout successful' });
