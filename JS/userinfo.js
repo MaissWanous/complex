@@ -13,13 +13,10 @@ module.exports = {
       database: "complex",
     }).promise();
 
-    let email, job;
-   
     app.post('/login', async (req, res) => {
       try {
-        email = req.body.email;
-        let password = req.body.password;
-        job = req.body.job;
+        const { email, password, job } = req.body;
+
         if (!email || !password || !job) {
           return res.status(400).send({ message: 'Missing required fields: email, password, and job' });
         }
@@ -41,10 +38,10 @@ module.exports = {
         if (!isPasswordCorrect.length) {
           return res.status(401).send({ message: 'Incorrect password' });
         }
-
+        let Job = job === 'Dr' ? "doctor" : "employee";
         // Successful login: Generate JWT 
         const secretKey = process.env.JWT_SECRET; // Access secret key from environment variable
-        const payload = { userId: user[0].ID, job }; // Include relevant user data in the payload
+        const payload = { userId: user[0].ID,Job }; // Include relevant user data in the payload
         const token = jwt.sign(payload, secretKey);
 
         res.send({ message: 'Login successful', token });
@@ -53,27 +50,27 @@ module.exports = {
         res.status(500).send({ message: 'Internal server error' });
       }
     });
-   
+
     app.post('/logout', async (req, res) => {
       try {
         const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
-    
+
         if (!token) {
           return res.status(401).send({ message: 'Missing authorization token' });
         }
-    
+
         // Verify the token using your secret key
-         jwt.verify(token, process.env.JWT_SECRET);
-    
-       
+        jwt.verify(token, process.env.JWT_SECRET);
+
+
         res.send({ message: 'Logout successful' });
       } catch (error) {
         console.error('Error during logout:', error);
         res.status(500).send({ message: 'Internal server error' });
       }
     });
-    
-    
+
+
     let resetCode;
     app.post('/forget', async (req, res) => {
       try {
@@ -172,25 +169,37 @@ module.exports = {
       }
     });
 
-    app.get('/userProfile', async (req, res) => {
+    const verifyJWT = (req, res, next) => {
+      const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
+
+      if (!token) {
+        return res.status(401).json({ message: 'Missing authorization token' });
+      }
+
       try {
-        if (!email) {
-          return res.status(400).json({ error: 'Missing required field: email' });
-        }
-        const [doctorResult, employeeResult] = await Promise.all([
-          pool.query('SELECT ID FROM doctor WHERE email = ?', [email]),
-          pool.query('SELECT ID FROM employee WHERE email = ?', [email]),
-        ]);
-        const table = job === 'Dr' ? 'doctor' : 'employee';
-        const isDoctor = job === 'Dr' ? 1 : 0;
-        const userId = job === 'Dr' ? doctorResult[0].ID : employeeResult[0].ID;
+        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+        req.userId = decodedToken.userId; // Store user ID for later use
+        req.job = decodedToken.Job;
+        next();
+      } catch (error) {
+        return res.status(401).json({ message: 'Invalid token' }); // Unauthorized if token is invalid
+      }
+    };
+
+    app.get('/userProfile', verifyJWT, async (req, res) => {
+      try {
+        const userId = req.userId; // Use userId and job from verified token
+        const job = req.job;
+        const table = job; 
+        const isDoctor = job === "doctor" ? 1 : 0;
+
         const [userInfo, userPayment] = await Promise.all([
-          pool.query('SELECT * FROM ?? WHERE email = ?', [table, email]),
+          pool.query('SELECT * FROM ?? WHERE id = ?', [table, userId]),
           pool.query('SELECT * FROM salaries WHERE user_id = ? AND is_doctor = ?', [userId, isDoctor]),
         ]);
 
         if (!userInfo[0]) {
-          return res.status(404).json({ error: 'No user found with this email' });
+          return res.status(404).json({ error: 'No user found with this ID' });
         }
 
         res.json({ userInfo: userInfo[0], userPayment });
