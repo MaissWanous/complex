@@ -3,6 +3,7 @@ module.exports = {
   userInfo: function (app, dic) {
 
     const jwt = require('jsonwebtoken');
+
     const pool = mysql.createPool({
       host: "localhost",
       user: "root",
@@ -31,7 +32,7 @@ module.exports = {
           return res.status(401).send({ message: 'Incorrect password' });
         }
         // Successful login: Generate JWT 
-        const secretKey = process.env.JWT_SECRET; // Access secret key from environment variable
+        const secretKey = "~u3!2t&zT^7z2X4yH^z9z2n^5n8s7z5z8z2z9n8z2n7z9z8z8"; // Access secret key from environment variable
         const payload = { userId: user[0].ID, Job }; // Include relevant user data in the payload
         const token = jwt.sign(payload, secretKey);
 
