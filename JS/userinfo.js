@@ -1,10 +1,7 @@
 const mysql = require("mysql2");
 module.exports = {
   userInfo: function (app, dic) {
-    // Endpoint to serve the login HTML file
-    app.get("/login", function (req, res) {
-      res.sendFile(dic + "/HTML/login.html");
-    });
+
     const jwt = require('jsonwebtoken');
     const pool = mysql.createPool({
       host: "localhost",
@@ -22,26 +19,20 @@ module.exports = {
         }
 
         let user; // Declare a variable to hold the retrieved user data
-
-        if (job === 'Dr') {
-          user = await pool.query('SELECT * FROM doctor WHERE email = ?', [email]);
-        } else {
-          user = await pool.query('SELECT * FROM employee WHERE email = ?', [email]);
-        }
-
+        let Job = job === 'Dr' ? "doctor" : "employee";
+        user = await pool.query('SELECT * FROM ?? WHERE email = ?', [Job, email]);
         if (!user.length) {
           return res.status(401).send({ message: 'Invalid email or job type' });
         }
 
-        const isPasswordCorrect = await pool.query('SELECT * FROM ?? WHERE password = ? AND email = ?', [job === 'Dr' ? 'doctor' : 'employee', password, email]);
+        const isPasswordCorrect = await pool.query('SELECT * FROM ?? WHERE password = ? AND email = ?', [Job, password, email]);
 
         if (!isPasswordCorrect.length) {
           return res.status(401).send({ message: 'Incorrect password' });
         }
-        let Job = job === 'Dr' ? "doctor" : "employee";
         // Successful login: Generate JWT 
         const secretKey = process.env.JWT_SECRET; // Access secret key from environment variable
-        const payload = { userId: user[0].ID,Job }; // Include relevant user data in the payload
+        const payload = { userId: user[0].ID, Job }; // Include relevant user data in the payload
         const token = jwt.sign(payload, secretKey);
 
         res.send({ message: 'Login successful', token });
@@ -190,7 +181,7 @@ module.exports = {
       try {
         const userId = req.userId; // Use userId and job from verified token
         const job = req.job;
-        const table = job; 
+        const table = job;
         const isDoctor = job === "doctor" ? 1 : 0;
 
         const [userInfo, userPayment] = await Promise.all([
