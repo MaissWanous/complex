@@ -5,7 +5,7 @@ module.exports = {
     app.get("/login", function (req, res) {
       res.sendFile(dic + "/HTML/login.html");
     });
-
+    const jwt = require('jsonwebtoken');
     const pool = mysql.createPool({
       host: "localhost",
       user: "root",
@@ -13,215 +13,192 @@ module.exports = {
       database: "complex",
     }).promise();
 
-    let email;
-    let password;
-    let job;
-    let check;
-    let code;
-    let snaps;
-    let checkCod;
-    let userId;
-    let error;
-
-    // Handle login endpoint
-    app.post("/login", async function (req, res) {
-      email = req.body.email;
-      password = req.body.password;
-      job = req.body.job;
-      check = "";
-
-      if (job == "Dr") {
-        // Check if the user is a doctor
-        await pool.query("SELECT * FROM doctor WHERE email = ?", [email])
-          .then(async ([rows]) => {
-            if (rows.length > 0) {
-              await pool.query("SELECT * FROM doctor WHERE password = ? and email = ?", [password, email])
-                .then(([rows]) => {
-                  if (rows.length > 0) {
-                    console.log(rows);
-                  } else {
-                    check = "password is incorrect";
-                  }
-                })
-                .catch((error) => {
-                  console.error(error);
-                });
-            } else {
-              check = "The entered email is wrong or you do not have the authority to log in to this account";
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-          });
-      } else {
-        // Check if the user is an employee
-        await pool.query("SELECT * FROM employee WHERE email = ?", [email])
-          .then(async ([rows]) => {
-            if (rows.length > 0) {
-              console.log(rows);
-              await pool.query("SELECT * FROM employee WHERE password = ? and email = ?", [password, email])
-                .then(([rows]) => {
-                  if (rows.length > 0) {
-                    console.log(rows);
-                  } else {
-                    check = "password is incorrect";
-                    console.log("nooo pass");
-                  }
-                })
-                .catch((error) => {
-                  console.error(error);
-                });
-            } else {
-              check = "The entered email is wrong or you do not have the authority to log in to this account";
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-          });
-      }
-
-      console.log(check);
-      res.send("");
-    });
-
-    // Handle forget endpoint
-    app.post("/forget", async (req, res) => {
-      email = req.body.email;
-      check = "";
-      snaps = false;
-
-      if (job == "Dr") {
-        // Check if the user is a doctor for password reset
-        userId = await pool.query("SELECT id FROM doctor WHERE email = ?", [email])
-          .then(async ([rows]) => {
-            if (rows.length == 0) {
-              check = "The entered email is wrong or you do not have the authority to log in to this account";
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-          });
-      } else {
-        // Check if the user is an employee for password reset
-        userId = await pool.query("SELECT id FROM employee WHERE email = ?", [email])
-          .then(async ([rows]) => {
-            if (rows.length == 0) {
-              check = "The entered email is wrong or you do not have the authority to log in to this account";
-              console.log("nooo");
-            }
-          })
-          .catch((error) => {
-            console.error(error);
-          });
-      }
-    });
-
-
-    console.log(check);
-    if (check == "") {
+    let email, job;
+   
+    app.post('/login', async (req, res) => {
       try {
-        code = Math.floor(Math.random() * 10000);
-        console.log(code);
-
-        const nodemailer = require("nodemailer"); // Require the Nodemailer package
-
-        async function sendMail() {
-          // SMTP config
-          const transporter = nodemailer.createTransport({
-            host: "smtp.elasticemail.com",
-            port: 2525,
-            auth: {
-              user: "hananalrstom87@gmail.com",
-              pass: "1980E59A59ABF2E83538525EF3B1FD9C1824",
-            },
-          });
-
-          // Send the email
-          let info = await transporter.sendMail({
-            from: "hananalrstom87@gmail.com",
-            to: email,
-            subject: "Reset your password",
-            text: "To reset your password, please use the following One Time code:",
-            html: "To reset, please use the following One Time code <strong>" + code + "</strong> :",
-          });
-
-          console.log("Message sent: %s", info.messageId); // Output message ID
-          console.log("View email: %s", nodemailer.getTestMessageUrl(info)); // URL to preview email
+        email = req.body.email;
+        let password = req.body.password;
+        job = req.body.job;
+        if (!email || !password || !job) {
+          return res.status(400).send({ message: 'Missing required fields: email, password, and job' });
         }
 
-        // Catch any errors and set 'snaps' to true
-        sendMail().catch((error) => {
-          console.error(error);
-          snaps = true;
+        let user; // Declare a variable to hold the retrieved user data
+
+        if (job === 'Dr') {
+          user = await pool.query('SELECT * FROM doctor WHERE email = ?', [email]);
+        } else {
+          user = await pool.query('SELECT * FROM employee WHERE email = ?', [email]);
+        }
+
+        if (!user.length) {
+          return res.status(401).send({ message: 'Invalid email or job type' });
+        }
+
+        const isPasswordCorrect = await pool.query('SELECT * FROM ?? WHERE password = ? AND email = ?', [job === 'Dr' ? 'doctor' : 'employee', password, email]);
+
+        if (!isPasswordCorrect.length) {
+          return res.status(401).send({ message: 'Incorrect password' });
+        }
+
+        // Successful login: Generate JWT 
+        const secretKey = process.env.JWT_SECRET; // Access secret key from environment variable
+        const payload = { userId: user[0].ID, job }; // Include relevant user data in the payload
+        const token = jwt.sign(payload, secretKey);
+
+        res.send({ message: 'Login successful', token });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Internal server error' });
+      }
+    });
+   
+    app.post('/logout', async (req, res) => {
+      try {
+        const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
+    
+        if (!token) {
+          return res.status(401).send({ message: 'Missing authorization token' });
+        }
+    
+        // Verify the token using your secret key
+         jwt.verify(token, process.env.JWT_SECRET);
+    
+       
+        res.send({ message: 'Logout successful' });
+      } catch (error) {
+        console.error('Error during logout:', error);
+        res.status(500).send({ message: 'Internal server error' });
+      }
+    });
+    
+    
+    let resetCode;
+    app.post('/forget', async (req, res) => {
+      try {
+        const { email } = req.body; // Destructuring for cleaner variable access
+
+        if (!email) {
+          return res.status(400).send({ message: 'Missing required field: email' });
+        }
+
+        const [doctorResult, employeeResult] = await Promise.all([
+          pool.query('SELECT ID FROM doctor WHERE email = ?', [email]),
+          pool.query('SELECT ID FROM employee WHERE email = ?', [email]),
+        ]);
+
+        if (!doctorResult[0].length && !employeeResult[0].length) {
+          return res.status(404).send({ message: 'Email not found' });
+        }
+
+
+        resetCode = Math.random().toString(36).substring(2, 15); // Generate random code
+
+        // Send email 
+        await sendPasswordResetEmail(email, resetCode);
+
+        res.send({ message: 'Password reset instructions sent to your email' });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Internal server error' });
+      }
+    });
+
+    async function sendPasswordResetEmail(email, resetCode) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: "smtp.elasticemail.com",
+          port: 2525,
+          auth: {
+            user: "hananalrstom87@gmail.com",
+            pass: "1980E59A59ABF2E83538525EF3B1FD9C1824",
+          },
         });
-      } catch (err) {
-        console.error(err);
+
+        const info = await transporter.sendMail({
+          from: "hananalrstom87@gmail.com",
+          to: email,
+          subject: "Reset your password",
+          text: "To reset your password, please use the following One Time code:",
+          html: `To reset, please use the following One Time code <strong>${resetCode}</strong>`,
+        });
+
+        console.log("Message sent:", info.messageId);
+      } catch (error) {
+        console.error("Error sending email:", error);
       }
     }
 
-    // Handle check code endpoint
-    app.post("/check", (req, res) => {
-      checkCod = req.body.code;
-      if (checkCod != code)
-        check = "incorrect code";
-      console.log(check);
-      res.send();
-    });
-
-    // Handle reset password endpoint
-    app.post("/resetPass", (req, res) => {
-      password = req.body.password;
-      var table = (job == "Dr") ? "doctor" : "employee";
-      pool.query("UPDATE ?? SET password = ? WHERE email = ?", [table, password, email]);
-      res.send();
-    });
-
-    // Handle forget endpoint
-    app.get("/forget", (req, res) => {
-      let obj = {
-        code: code,
-        check: check,
-        snaps: snaps
-      };
-      res.json(obj);
-    });
-
-    // Handle login endpoint
-    app.get("/login", function (req, res) {
-      let obj = {
-        check: check,
-      };
-      res.json(obj);
-    });
-
-    // Handle user information query endpoint
-    app.get("/userInfo", async (req, res) => {
+    app.post('/check', (req, res) => {
       try {
-        let userInfo, userPayment;
+        const { code } = req.body; // Destructuring for cleaner variable access
 
-        if (job == "Dr") {
-          userInfo = await pool.query("SELECT * FROM doctor WHERE email = ?", [email]);
-          userPayment = await pool.query("SELECT * FROM salaries WHERE user_id = ? and is_doctor = 1", [userId]);
-        } else {
-          userInfo = await pool.query("SELECT * FROM employee WHERE email = ?", [email]);
-          userPayment = await pool.query("SELECT * FROM salaries WHERE user_id = ? and is_doctor = 0", [userId]);
+        if (!code) {
+          return res.status(400).send({ message: 'Missing required field: code' });
         }
 
-        if (userInfo.length === 0) {
-          return res.status(404).json({ error: "No employee found with this email." });
+        if (code !== resetCode) {
+          return res.status(401).send({ message: 'Incorrect reset code' }); // Use 401 for unauthorized
         }
 
-        res.json({
-          userInfo: userInfo,
-          userPayment: userPayment,
-          error: error
-        });
+        // Reset code matches
+        res.send({ message: 'Reset code verified. Please proceed to set a new password' });
       } catch (error) {
-        console.error("Error executing the query:", error);
-        return res.status(500).json({
-          error: "An error occurred while fetching the employee information.",
-        });
+        console.error(error);
+        res.status(500).send({ message: 'Internal server error' });
       }
     });
+
+
+    app.post('/resetPass', async (req, res) => {
+      try {
+        const { password } = req.body; // Destructuring for cleaner variable access
+
+        if (!password) {
+          return res.status(400).send({ message: 'Missing required field: password' });
+        }
+
+        // const hashedPassword = await bcrypt.hash(password, 10); // Hash the password using bcrypt
+
+        const table = job === 'Dr' ? 'doctor' : 'employee';
+
+        await pool.query('UPDATE ?? SET password = ? WHERE email = ?', [table, password, email]);
+
+        res.send({ message: 'Password reset successful' });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Internal server error' });
+      }
+    });
+
+    app.get('/userProfile', async (req, res) => {
+      try {
+        if (!email) {
+          return res.status(400).json({ error: 'Missing required field: email' });
+        }
+        const [doctorResult, employeeResult] = await Promise.all([
+          pool.query('SELECT ID FROM doctor WHERE email = ?', [email]),
+          pool.query('SELECT ID FROM employee WHERE email = ?', [email]),
+        ]);
+        const table = job === 'Dr' ? 'doctor' : 'employee';
+        const isDoctor = job === 'Dr' ? 1 : 0;
+        const userId = job === 'Dr' ? doctorResult[0].ID : employeeResult[0].ID;
+        const [userInfo, userPayment] = await Promise.all([
+          pool.query('SELECT * FROM ?? WHERE email = ?', [table, email]),
+          pool.query('SELECT * FROM salaries WHERE user_id = ? AND is_doctor = ?', [userId, isDoctor]),
+        ]);
+
+        if (!userInfo[0]) {
+          return res.status(404).json({ error: 'No user found with this email' });
+        }
+
+        res.json({ userInfo: userInfo[0], userPayment });
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
   }
 }

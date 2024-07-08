@@ -104,6 +104,7 @@ module.exports = {
           "SELECT item_id, amount FROM invoice WHERE lab_id = ? AND date = ?",
           [parseInt(labId), date]
         );
+        console.log(invoice)
 
         if (invoice[0].length === 0) {
           throw new Error("Invoice not found"); // Handle non-existent invoice
