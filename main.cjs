@@ -4,7 +4,7 @@ const fileUpload = require('express-fileupload');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
-require('dotenv').config();
+
 
 
 // Create an instance of Express app

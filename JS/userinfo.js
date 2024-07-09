@@ -1,14 +1,14 @@
 const mysql = require("mysql2");
 module.exports = {
   userInfo: function (app, dic) {
+    require('dotenv').config();
     const jwt = require("jsonwebtoken");
-
     const pool = mysql
       .createPool({
         host: "localhost",
         user: "root",
         password: "1234",
-        database: "project",
+        database: "complex",
       })
       .promise();
 
@@ -68,11 +68,11 @@ module.exports = {
       return refreshTokens.some(token => token === refreshToken); // Check if refresh token exists in the array
     }
 
-    let Job;
+    let Jobb;
     app.post("/login", async (req, res) => {
       try {
         const { email, password, job } = req.body;
-        Job = job;
+        Jobb = job;
         if (!email || !password || !job) {
           return res.status(400).send({
             message: "Missing required fields: email, password, and job",
@@ -255,7 +255,7 @@ module.exports = {
 
         // const hashedPassword = await bcrypt.hash(password, 10); // Hash the password using bcrypt
 
-        const table = Job === "Dr" ? "doctor" : "employee";
+        const table = Jobb === "Dr" ? "doctor" : "employee";
 
         await pool.query("UPDATE ?? SET password = ? WHERE email = ?", [
           table,
@@ -323,22 +323,24 @@ module.exports = {
           birthDate,
           address,
           password,
-          jobTitle,
           salaryPercentage,
+          jobTitle,
         ]
-        switch (jobTitle.toLowerCase()) {
-          case 'dr':
+        switch (jobTitle) {
+          case 'Dr':
             employeeInfo = 'INSERT INTO doctor (fname, lname, sex, email, phone, birthdate, address, password, percentage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
-            salaryPercentage = req.body.salaryPercentage || 0;
+            salaryPercentage = parseFloat(req.body.salaryPercentage) || 0.0;
             employeeData.slice(0, -1);
             break;
           case 'admin':
           case 'reception':
-            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, job_title, salary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, salary, job_title) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            salaryPercentage = parseInt(req.body.salaryPercentage) || 0;
             break;
           case 'other':
             const job = req.body.job;
-            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, job_title, salary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, salary, job_title) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            salaryPercentage = parseInt(req.body.salaryPercentage) || 0;
             jobTitle = job;
             break;
           default:
