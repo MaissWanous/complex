@@ -57,15 +57,9 @@ module.exports = {
 
     // Environment variables for JWT secrets
     const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-    const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
     // Helper function to generate a random string for refresh tokens
     function generateRefreshToken() {
       return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    }
-    let refreshTokens = [];
-
-    function verifyRefreshToken(refreshToken) {
-      return refreshTokens.some(token => token === refreshToken); // Check if refresh token exists in the array
     }
 
     let Jobb;
@@ -98,10 +92,9 @@ module.exports = {
         }
         // Successful login: Generate JWT
         const payload = { userId: user[0].ID, Job }; // Include relevant user data in the payload
-        const accessToken = jwt.sign({ payload }, ACCESS_TOKEN_SECRET, { expiresIn: '1h' }); // Access token expires in 1 hour
-        const refreshToken = generateRefreshToken();
-        // Store refresh token in in-memory array (NOT RECOMMENDED FOR PRODUCTION)
-        refreshTokens.push(refreshToken);
+        const accessToken = jwt.sign({ payload }, ACCESS_TOKEN_SECRET, { expiresIn: '2h' }); // Access token expires in 1 hour
+        const refreshToken = ACCESS_TOKEN_SECRET;
+        
         res.send({ message: 'Login successful', accessToken, refreshToken });
 
       } catch (error) {
@@ -112,55 +105,30 @@ module.exports = {
 
     app.post('/refresh', async (req, res) => {
       try {
-        const refreshToken = req.body.refreshToken;
+        let refreshToken = req.body.refreshToken;
+        const accessToken = req.body.accessToken;
+
 
         if (!refreshToken) {
           return res.status(400).send({ message: 'Missing refresh token' });
         }
 
-        // Verify refresh token (using in-memory array - NOT RECOMMENDED FOR PRODUCTION)
-        const isRefreshTokenValid = verifyRefreshToken(refreshToken);
-
-        if (!isRefreshTokenValid) {
-          return res.status(401).send({ message: 'Invalid refresh token' });
-        }
 
         // Generate new access token
-        const decodedRefreshToken = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+        const decodedRefreshToken = jwt.verify(accessToken, refreshToken);
         const userId = decodedRefreshToken.userId;
         const Job = decodedRefreshToken.Job;
-        const newAccessToken = jwt.sign({ userId, Job }, ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        refreshToken = generateRefreshToken();
+        const newAccessToken = jwt.sign({ userId, Job }, refreshToken, { expiresIn: '2h' });
 
-        res.send({ message: 'Refresh successful', accessToken: newAccessToken });
+        res.send({ message: 'Refresh successful', accessToken: newAccessToken, refreshToken });
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: 'Internal server error' });
       }
     });
 
-    app.post('/logout', async (req, res) => {
-      try {
-        const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
 
-        if (!token) {
-          return res.status(401).send({ message: 'Missing authorization token' });
-        }
-
-        // Verify the access token (optional, but recommended for security)
-        jwt.verify(token, ACCESS_TOKEN_SECRET);
-
-        // Optional: Invalidate refresh token 
-        const index = refreshTokens.indexOf(token); // Check if token is a refresh token
-        if (index !== -1) {
-          refreshTokens.splice(index, 1);
-        }
-
-        res.send({ message: 'Logout successful' });
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ message: 'Internal server error' });
-      }
-    });
 
     let resetCode;
     app.post("/forget", async (req, res) => {
