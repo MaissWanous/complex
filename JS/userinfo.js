@@ -1,95 +1,105 @@
 const mysql = require("mysql2");
 module.exports = {
   userInfo: function (app, dic) {
+    const jwt = require("jsonwebtoken");
 
-    const jwt = require('jsonwebtoken');
+    const pool = mysql
+      .createPool({
+        host: "localhost",
+        user: "root",
+        password: "1234",
+        database: "project",
+      })
+      .promise();
 
-    const pool = mysql.createPool({
-      host: "localhost",
-      user: "root",
-      password: "1234",
-      database: "complex",
-    }).promise();
-
-    app.post('/login', async (req, res) => {
+    app.post("/login", async (req, res) => {
       try {
         const { email, password, job } = req.body;
 
         if (!email || !password || !job) {
-          return res.status(400).send({ message: 'Missing required fields: email, password, and job' });
+          return res.status(400).send({
+            message: "Missing required fields: email, password, and job",
+          });
         }
 
         let user; // Declare a variable to hold the retrieved user data
-        let Job = job === 'Dr' ? "doctor" : "employee";
-        user = await pool.query('SELECT * FROM ?? WHERE email = ?', [Job, email]);
+        let Job = job === "Dr" ? "doctor" : "employee";
+        user = await pool.query("SELECT * FROM ?? WHERE email = ?", [
+          Job,
+          email,
+        ]);
         if (!user[0].length) {
-          return res.status(401).send({ message: 'Invalid email ' });
+          return res.status(401).send({ message: "Invalid email " });
         }
 
-        const isPasswordCorrect = await pool.query('SELECT * FROM ?? WHERE password = ? AND email = ?', [Job, password, email]);
+        const isPasswordCorrect = await pool.query(
+          "SELECT * FROM ?? WHERE password = ? AND email = ?",
+          [Job, password, email]
+        );
         if (!isPasswordCorrect[0].length) {
-          return res.status(401).send({ message: 'Incorrect password' });
+          return res.status(401).send({ message: "Incorrect password" });
         }
-        // Successful login: Generate JWT 
+        // Successful login: Generate JWT
         const secretKey = "~u3!2t&zT^7z2X4yH^z9z2n^5n8s7z5z8z2z9n8z2n7z9z8z8"; // Access secret key from environment variable
         const payload = { userId: user[0].ID, Job }; // Include relevant user data in the payload
         const token = jwt.sign(payload, secretKey);
 
-        res.send({ message: 'Login successful', token });
+        res.send({ message: "Login successful", token });
       } catch (error) {
         console.error(error);
-        res.status(500).send({ message: 'Internal server error' });
+        res.status(500).send({ message: "Internal server error" });
       }
     });
 
-    app.post('/logout', async (req, res) => {
+    app.post("/logout", async (req, res) => {
       try {
-        const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
+        const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from authorization header
 
         if (!token) {
-          return res.status(401).send({ message: 'Missing authorization token' });
+          return res
+            .status(401)
+            .send({ message: "Missing authorization token" });
         }
 
         // Verify the token using your secret key
         jwt.verify(token, "~u3!2t&zT^7z2X4yH^z9z2n^5n8s7z5z8z2z9n8z2n7z9z8z8");
 
-
-        res.send({ message: 'Logout successful' });
+        res.send({ message: "Logout successful" });
       } catch (error) {
-        console.error('Error during logout:', error);
-        res.status(500).send({ message: 'Internal server error' });
+        console.error("Error during logout:", error);
+        res.status(500).send({ message: "Internal server error" });
       }
     });
 
-
     let resetCode;
-    app.post('/forget', async (req, res) => {
+    app.post("/forget", async (req, res) => {
       try {
         const { email } = req.body; // Destructuring for cleaner variable access
 
         if (!email) {
-          return res.status(400).send({ message: 'Missing required field: email' });
+          return res
+            .status(400)
+            .send({ message: "Missing required field: email" });
         }
 
         const [doctorResult, employeeResult] = await Promise.all([
-          pool.query('SELECT ID FROM doctor WHERE email = ?', [email]),
-          pool.query('SELECT ID FROM employee WHERE email = ?', [email]),
+          pool.query("SELECT ID FROM doctor WHERE email = ?", [email]),
+          pool.query("SELECT ID FROM employee WHERE email = ?", [email]),
         ]);
 
         if (!doctorResult[0].length && !employeeResult[0].length) {
-          return res.status(404).send({ message: 'Email not found' });
+          return res.status(404).send({ message: "Email not found" });
         }
-
 
         resetCode = Math.random().toString(36).substring(2, 15); // Generate random code
 
-        // Send email 
+        // Send email
         await sendPasswordResetEmail(email, resetCode);
 
-        res.send({ message: 'Password reset instructions sent to your email' });
+        res.send({ message: "Password reset instructions sent to your email" });
       } catch (error) {
         console.error(error);
-        res.status(500).send({ message: 'Internal server error' });
+        res.status(500).send({ message: "Internal server error" });
       }
     });
 
@@ -118,53 +128,62 @@ module.exports = {
       }
     }
 
-    app.post('/check', (req, res) => {
+    app.post("/check", (req, res) => {
       try {
         const { code } = req.body; // Destructuring for cleaner variable access
 
         if (!code) {
-          return res.status(400).send({ message: 'Missing required field: code' });
+          return res
+            .status(400)
+            .send({ message: "Missing required field: code" });
         }
 
         if (code !== resetCode) {
-          return res.status(401).send({ message: 'Incorrect reset code' }); // Use 401 for unauthorized
+          return res.status(401).send({ message: "Incorrect reset code" }); // Use 401 for unauthorized
         }
 
         // Reset code matches
-        res.send({ message: 'Reset code verified. Please proceed to set a new password' });
+        res.send({
+          message: "Reset code verified. Please proceed to set a new password",
+        });
       } catch (error) {
         console.error(error);
-        res.status(500).send({ message: 'Internal server error' });
+        res.status(500).send({ message: "Internal server error" });
       }
     });
 
-
-    app.post('/resetPass', async (req, res) => {
+    app.post("/resetPass", async (req, res) => {
       try {
         const { password } = req.body; // Destructuring for cleaner variable access
 
         if (!password) {
-          return res.status(400).send({ message: 'Missing required field: password' });
+          return res
+            .status(400)
+            .send({ message: "Missing required field: password" });
         }
 
         // const hashedPassword = await bcrypt.hash(password, 10); // Hash the password using bcrypt
 
-        const table = job === 'Dr' ? 'doctor' : 'employee';
+        const table = job === "Dr" ? "doctor" : "employee";
 
-        await pool.query('UPDATE ?? SET password = ? WHERE email = ?', [table, password, email]);
+        await pool.query("UPDATE ?? SET password = ? WHERE email = ?", [
+          table,
+          password,
+          email,
+        ]);
 
-        res.send({ message: 'Password reset successful' });
+        res.send({ message: "Password reset successful" });
       } catch (error) {
         console.error(error);
-        res.status(500).send({ message: 'Internal server error' });
+        res.status(500).send({ message: "Internal server error" });
       }
     });
 
     const verifyJWT = (req, res, next) => {
-      const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
+      const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from authorization header
 
       if (!token) {
-        return res.status(401).json({ message: 'Missing authorization token' });
+        return res.status(401).json({ message: "Missing authorization token" });
       }
 
       try {
@@ -173,11 +192,11 @@ module.exports = {
         req.job = decodedToken.Job;
         next();
       } catch (error) {
-        return res.status(401).json({ message: 'Invalid token' }); // Unauthorized if token is invalid
+        return res.status(401).json({ message: "Invalid token" }); // Unauthorized if token is invalid
       }
     };
 
-    app.get('/userProfile', verifyJWT, async (req, res) => {
+    app.get("/userProfile", verifyJWT, async (req, res) => {
       try {
         const userId = req.userId; // Use userId and job from verified token
         const job = req.job;
@@ -185,20 +204,159 @@ module.exports = {
         const isDoctor = job === "doctor" ? 1 : 0;
 
         const [userInfo, userPayment] = await Promise.all([
-          pool.query('SELECT * FROM ?? WHERE id = ?', [table, userId]),
-          pool.query('SELECT * FROM salaries WHERE user_id = ? AND is_doctor = ?', [userId, isDoctor]),
+          pool.query("SELECT * FROM ?? WHERE id = ?", [table, userId]),
+          pool.query(
+            "SELECT * FROM salaries WHERE user_id = ? AND is_doctor = ?",
+            [userId, isDoctor]
+          ),
         ]);
 
         if (!userInfo[0]) {
-          return res.status(404).json({ error: 'No user found with this ID' });
+          return res.status(404).json({ error: "No user found with this ID" });
         }
 
         res.json({ userInfo: userInfo[0], userPayment });
       } catch (error) {
-        console.error('Error fetching user profile:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error("Error fetching user profile:", error);
+        res.status(500).json({ error: "Internal server error" });
       }
     });
+    // info about  drs and employee
+    app.get("/api/combined-data", async (req, res) => {
+      try {
+        const drs_emp_data = await pool.query(
+          "SELECT fname ,id ,email, phone, address FROM employee UNION ALL SELECT fname, id,email, phone ,address FROM doctor"
+        );
 
-  }
-}
+        res.json({ drs_emp_data: drs_emp_data[0] });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Something went wrong" });
+      }
+    });
+    // add new employee or doctor
+    app.post("/addEmployee", function (req, res) {
+      try {
+        fname = req.body.fname;
+        lname = req.body.lname;
+        sex = req.body.sex;
+        email = req.body.email;
+        phone = req.body.phone;
+        birth_date = req.body.birth_date;
+        address = req.body.address;
+        password = req.body.password;
+        salary_percentage = req.body.salary_percentage;
+        job_title = req.body.job_title;
+        if (job_title == "Drs") {
+          const employee_info =
+            "INSERT INTO doctor (fname,lname,sex,email,phone,birthdate,address,password,percentage) VALUES (?,?,?,?,?,?,?,?,?)";
+          pool.query(
+            employee_info,
+            [
+              fname,
+              lname,
+              sex,
+              email,
+              phone,
+              birthdate,
+              address,
+              password,
+              salary_percentage,
+            ],
+            (error, results, fields) => {
+              if (error) {
+                console.error(error);
+                return;
+              }
+              console.log(`Inserted ${results.affectedRows} row(s)`);
+            }
+          );
+        }
+        if (job_title == "admin") {
+          salary_percentage = 0;
+          const employee_info =
+            "INSERT INTO employee (fname,lname,sex,email,phone,birthdate,address,password,job_title,salary) VALUES (?,?,?,?,?,?,?,?,?,?)";
+          pool.query(
+            employee_info,
+            [
+              fname,
+              lname,
+              sex,
+              email,
+              phone,
+              birthdate,
+              address,
+              password,
+              job_title,
+              salary_percentage,
+            ],
+            (error, results, fields) => {
+              if (error) {
+                console.error(error);
+                return;
+              }
+              console.log(`Inserted ${results.affectedRows} row(s)`);
+            }
+          );
+        }
+        if (job_title == "reception") {
+          const employee_info =
+            "INSERT INTO employee (fname,lname,sex,email,phone,birthdate,address,password,job_title,salary) VALUES (?,?,?,?,?,?,?,?,?,?)";
+          pool.query(
+            employee_info,
+            [
+              fname,
+              lname,
+              sex,
+              email,
+              phone,
+              birthdate,
+              address,
+              password,
+              job_title,
+              salary_percentage,
+            ],
+            (error, results, fields) => {
+              if (error) {
+                console.error(error);
+                return;
+              }
+              console.log(`Inserted ${results.affectedRows} row(s)`);
+            }
+          );
+        }
+        if (job_title == "other") {
+          job = req.body.job;
+          const employee_info =
+            "INSERT INTO employee (fname,lname,sex,email,phone,birthdate,address,password,job_title,salary) VALUES (?,?,?,?,?,?,?,?,?,?)";
+          pool.query(
+            employee_info,
+            [
+              fname,
+              lname,
+              sex,
+              email,
+              phone,
+              birthdate,
+              address,
+              password,
+              job,
+              salary_percentage,
+            ],
+            (error, results, fields) => {
+              if (error) {
+                console.error(error);
+                return;
+              }
+              console.log(`Inserted ${results.affectedRows} row(s)`);
+            }
+          );
+        }
+        res.send({ message: "An employee has been added successfully" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Internal server error" });
+      }
+    });
+  },
+};
