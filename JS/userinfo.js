@@ -12,10 +12,67 @@ module.exports = {
       })
       .promise();
 
+    const verifyJWT = async (req, res, next) => {
+      const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
+
+      if (!token) {
+        return res.status(401).json({ message: 'Missing authorization token' });
+      }
+
+      try {
+        // Attempt to verify the token as an access token
+        const decodedToken = jwt.verify(token, ACCESS_TOKEN_SECRET);
+        req.userId = decodedToken.userId;
+        req.job = decodedToken.job;
+        next();
+      } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+          // If access token is expired, attempt to refresh using refresh token
+          const refreshToken = req.body.refreshToken; // Check for refresh token in request body
+
+          if (!refreshToken) {
+            return res.status(401).json({ message: 'Access token expired and no refresh token provided' });
+          }
+
+          // Verify refresh token 
+          const isRefreshTokenValid = await verifyRefreshToken(refreshToken);
+
+          if (!isRefreshTokenValid) {
+            return res.status(401).json({ message: 'Invalid refresh token' });
+          }
+
+          // Generate a new access token using refresh token
+          const decodedRefreshToken = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+          const userId = decodedRefreshToken.userId;
+          const newAccessToken = jwt.sign({ userId, job: req.job }, ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+
+          res.json({ message: 'Access token refreshed', accessToken: newAccessToken });
+          return; // Don't call next() after refresh
+        } else {
+          // Other errors (e.g., invalid token format)
+          return res.status(401).json({ message: 'Invalid token' });
+        }
+      }
+    };
+
+    // Environment variables for JWT secrets
+    const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+    const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
+    // Helper function to generate a random string for refresh tokens
+    function generateRefreshToken() {
+      return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    }
+    let refreshTokens = [];
+
+    function verifyRefreshToken(refreshToken) {
+      return refreshTokens.some(token => token === refreshToken); // Check if refresh token exists in the array
+    }
+
+    let Job;
     app.post("/login", async (req, res) => {
       try {
         const { email, password, job } = req.body;
-
+        Job = job;
         if (!email || !password || !job) {
           return res.status(400).send({
             message: "Missing required fields: email, password, and job",
@@ -40,34 +97,68 @@ module.exports = {
           return res.status(401).send({ message: "Incorrect password" });
         }
         // Successful login: Generate JWT
-        const secretKey = "~u3!2t&zT^7z2X4yH^z9z2n^5n8s7z5z8z2z9n8z2n7z9z8z8"; // Access secret key from environment variable
         const payload = { userId: user[0].ID, Job }; // Include relevant user data in the payload
-        const token = jwt.sign(payload, secretKey);
+        const accessToken = jwt.sign({ payload }, ACCESS_TOKEN_SECRET, { expiresIn: '1h' }); // Access token expires in 1 hour
+        const refreshToken = generateRefreshToken();
+        // Store refresh token in in-memory array (NOT RECOMMENDED FOR PRODUCTION)
+        refreshTokens.push(refreshToken);
+        res.send({ message: 'Login successful', accessToken, refreshToken });
 
-        res.send({ message: "Login successful", token });
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Internal server error" });
       }
     });
 
-    app.post("/logout", async (req, res) => {
+    app.post('/refresh', async (req, res) => {
       try {
-        const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from authorization header
+        const refreshToken = req.body.refreshToken;
 
-        if (!token) {
-          return res
-            .status(401)
-            .send({ message: "Missing authorization token" });
+        if (!refreshToken) {
+          return res.status(400).send({ message: 'Missing refresh token' });
         }
 
-        // Verify the token using your secret key
-        jwt.verify(token, "~u3!2t&zT^7z2X4yH^z9z2n^5n8s7z5z8z2z9n8z2n7z9z8z8");
+        // Verify refresh token (using in-memory array - NOT RECOMMENDED FOR PRODUCTION)
+        const isRefreshTokenValid = verifyRefreshToken(refreshToken);
 
-        res.send({ message: "Logout successful" });
+        if (!isRefreshTokenValid) {
+          return res.status(401).send({ message: 'Invalid refresh token' });
+        }
+
+        // Generate new access token
+        const decodedRefreshToken = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+        const userId = decodedRefreshToken.userId;
+        const Job = decodedRefreshToken.Job;
+        const newAccessToken = jwt.sign({ userId, Job }, ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+
+        res.send({ message: 'Refresh successful', accessToken: newAccessToken });
       } catch (error) {
-        console.error("Error during logout:", error);
-        res.status(500).send({ message: "Internal server error" });
+        console.error(error);
+        res.status(500).send({ message: 'Internal server error' });
+      }
+    });
+
+    app.post('/logout', async (req, res) => {
+      try {
+        const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
+
+        if (!token) {
+          return res.status(401).send({ message: 'Missing authorization token' });
+        }
+
+        // Verify the access token (optional, but recommended for security)
+        jwt.verify(token, ACCESS_TOKEN_SECRET);
+
+        // Optional: Invalidate refresh token 
+        const index = refreshTokens.indexOf(token); // Check if token is a refresh token
+        if (index !== -1) {
+          refreshTokens.splice(index, 1);
+        }
+
+        res.send({ message: 'Logout successful' });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: 'Internal server error' });
       }
     });
 
@@ -154,7 +245,7 @@ module.exports = {
 
     app.post("/resetPass", async (req, res) => {
       try {
-        const { password } = req.body; // Destructuring for cleaner variable access
+        const { password } = req.body;
 
         if (!password) {
           return res
@@ -164,7 +255,7 @@ module.exports = {
 
         // const hashedPassword = await bcrypt.hash(password, 10); // Hash the password using bcrypt
 
-        const table = job === "Dr" ? "doctor" : "employee";
+        const table = Job === "Dr" ? "doctor" : "employee";
 
         await pool.query("UPDATE ?? SET password = ? WHERE email = ?", [
           table,
@@ -178,23 +269,6 @@ module.exports = {
         res.status(500).send({ message: "Internal server error" });
       }
     });
-
-    const verifyJWT = (req, res, next) => {
-      const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from authorization header
-
-      if (!token) {
-        return res.status(401).json({ message: "Missing authorization token" });
-      }
-
-      try {
-        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-        req.userId = decodedToken.userId; // Store user ID for later use
-        req.job = decodedToken.Job;
-        next();
-      } catch (error) {
-        return res.status(401).json({ message: "Invalid token" }); // Unauthorized if token is invalid
-      }
-    };
 
     app.get("/userProfile", verifyJWT, async (req, res) => {
       try {
@@ -215,7 +289,7 @@ module.exports = {
           return res.status(404).json({ error: "No user found with this ID" });
         }
 
-        res.json({ userInfo: userInfo[0], userPayment });
+        res.json({ userInfo: userInfo[0], userPayment: userPayment[0] });
       } catch (error) {
         console.error("Error fetching user profile:", error);
         res.status(500).json({ error: "Internal server error" });
@@ -235,128 +309,54 @@ module.exports = {
       }
     });
     // add new employee or doctor
-    app.post("/addEmployee", function (req, res) {
+    app.post('/addEmployee', async (req, res) => {
       try {
-        fname = req.body.fname;
-        lname = req.body.lname;
-        sex = req.body.sex;
-        email = req.body.email;
-        phone = req.body.phone;
-        birth_date = req.body.birth_date;
-        address = req.body.address;
-        password = req.body.password;
-        salary_percentage = req.body.salary_percentage;
-        job_title = req.body.job_title;
-        if (job_title == "Drs") {
-          const employee_info =
-            "INSERT INTO doctor (fname,lname,sex,email,phone,birthdate,address,password,percentage) VALUES (?,?,?,?,?,?,?,?,?)";
-          pool.query(
-            employee_info,
-            [
-              fname,
-              lname,
-              sex,
-              email,
-              phone,
-              birthdate,
-              address,
-              password,
-              salary_percentage,
-            ],
-            (error, results, fields) => {
-              if (error) {
-                console.error(error);
-                return;
-              }
-              console.log(`Inserted ${results.affectedRows} row(s)`);
-            }
-          );
+        const { fname, lname, sex, email, phone, birthDate, address, password, jobTitle } = req.body;
+
+        let employeeInfo, employeeData, salaryPercentage = 0;
+        employeeData = [
+          fname,
+          lname,
+          sex,
+          email,
+          phone,
+          birthDate,
+          address,
+          password,
+          jobTitle,
+          salaryPercentage,
+        ]
+        switch (jobTitle.toLowerCase()) {
+          case 'dr':
+            employeeInfo = 'INSERT INTO doctor (fname, lname, sex, email, phone, birthdate, address, password, percentage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            salaryPercentage = req.body.salaryPercentage || 0;
+            employeeData.slice(0, -1);
+            break;
+          case 'admin':
+          case 'reception':
+            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, job_title, salary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            break;
+          case 'other':
+            const job = req.body.job;
+            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, job_title, salary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            jobTitle = job;
+            break;
+          default:
+            return res.status(400).send({ message: 'Invalid job title' });
         }
-        if (job_title == "admin") {
-          salary_percentage = 0;
-          const employee_info =
-            "INSERT INTO employee (fname,lname,sex,email,phone,birthdate,address,password,job_title,salary) VALUES (?,?,?,?,?,?,?,?,?,?)";
-          pool.query(
-            employee_info,
-            [
-              fname,
-              lname,
-              sex,
-              email,
-              phone,
-              birthdate,
-              address,
-              password,
-              job_title,
-              salary_percentage,
-            ],
-            (error, results, fields) => {
-              if (error) {
-                console.error(error);
-                return;
-              }
-              console.log(`Inserted ${results.affectedRows} row(s)`);
-            }
-          );
+
+        const [results] = await pool.query(employeeInfo, employeeData);
+
+        if (results.affectedRows) {
+          res.send({ message: 'Employee added successfully' });
+        } else {
+          res.status(500).send({ message: 'Failed to add employee' });
         }
-        if (job_title == "reception") {
-          const employee_info =
-            "INSERT INTO employee (fname,lname,sex,email,phone,birthdate,address,password,job_title,salary) VALUES (?,?,?,?,?,?,?,?,?,?)";
-          pool.query(
-            employee_info,
-            [
-              fname,
-              lname,
-              sex,
-              email,
-              phone,
-              birthdate,
-              address,
-              password,
-              job_title,
-              salary_percentage,
-            ],
-            (error, results, fields) => {
-              if (error) {
-                console.error(error);
-                return;
-              }
-              console.log(`Inserted ${results.affectedRows} row(s)`);
-            }
-          );
-        }
-        if (job_title == "other") {
-          job = req.body.job;
-          const employee_info =
-            "INSERT INTO employee (fname,lname,sex,email,phone,birthdate,address,password,job_title,salary) VALUES (?,?,?,?,?,?,?,?,?,?)";
-          pool.query(
-            employee_info,
-            [
-              fname,
-              lname,
-              sex,
-              email,
-              phone,
-              birthdate,
-              address,
-              password,
-              job,
-              salary_percentage,
-            ],
-            (error, results, fields) => {
-              if (error) {
-                console.error(error);
-                return;
-              }
-              console.log(`Inserted ${results.affectedRows} row(s)`);
-            }
-          );
-        }
-        res.send({ message: "An employee has been added successfully" });
       } catch (error) {
         console.error(error);
-        res.status(500).send({ message: "Internal server error" });
+        res.status(500).send({ message: 'Internal server error' });
       }
     });
+
   },
 };
