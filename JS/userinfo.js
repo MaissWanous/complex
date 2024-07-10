@@ -1,22 +1,22 @@
 const mysql = require("mysql2");
 module.exports = {
   userInfo: function (app, dic) {
-    require('dotenv').config();
+    require("dotenv").config();
     const jwt = require("jsonwebtoken");
     const pool = mysql
       .createPool({
         host: "localhost",
         user: "root",
         password: "1234",
-        database: "complex",
+        database: "project",
       })
       .promise();
 
     const verifyJWT = async (req, res, next) => {
-      const token = req.headers['authorization']?.split(' ')[1]; // Extract token from authorization header
+      const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from authorization header
 
       if (!token) {
-        return res.status(401).json({ message: 'Missing authorization token' });
+        return res.status(401).json({ message: "Missing authorization token" });
       }
 
       try {
@@ -26,31 +26,45 @@ module.exports = {
         req.job = decodedToken.job;
         next();
       } catch (error) {
-        if (error.name === 'TokenExpiredError') {
+        if (error.name === "TokenExpiredError") {
           // If access token is expired, attempt to refresh using refresh token
           const refreshToken = req.body.refreshToken; // Check for refresh token in request body
 
           if (!refreshToken) {
-            return res.status(401).json({ message: 'Access token expired and no refresh token provided' });
+            return res
+              .status(401)
+              .json({
+                message: "Access token expired and no refresh token provided",
+              });
           }
 
-          // Verify refresh token 
+          // Verify refresh token
           const isRefreshTokenValid = await verifyRefreshToken(refreshToken);
 
           if (!isRefreshTokenValid) {
-            return res.status(401).json({ message: 'Invalid refresh token' });
+            return res.status(401).json({ message: "Invalid refresh token" });
           }
 
           // Generate a new access token using refresh token
-          const decodedRefreshToken = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+          const decodedRefreshToken = jwt.verify(
+            refreshToken,
+            REFRESH_TOKEN_SECRET
+          );
           const userId = decodedRefreshToken.userId;
-          const newAccessToken = jwt.sign({ userId, job: req.job }, ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+          const newAccessToken = jwt.sign(
+            { userId, job: req.job },
+            ACCESS_TOKEN_SECRET,
+            { expiresIn: "1h" }
+          );
 
-          res.json({ message: 'Access token refreshed', accessToken: newAccessToken });
+          res.json({
+            message: "Access token refreshed",
+            accessToken: newAccessToken,
+          });
           return; // Don't call next() after refresh
         } else {
           // Other errors (e.g., invalid token format)
-          return res.status(401).json({ message: 'Invalid token' });
+          return res.status(401).json({ message: "Invalid token" });
         }
       }
     };
@@ -59,7 +73,10 @@ module.exports = {
     const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
     // Helper function to generate a random string for refresh tokens
     function generateRefreshToken() {
-      return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      return (
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15)
+      );
     }
 
     let Jobb;
@@ -92,43 +109,46 @@ module.exports = {
         }
         // Successful login: Generate JWT
         const payload = { userId: user[0].ID, Job }; // Include relevant user data in the payload
-        const accessToken = jwt.sign({ payload }, ACCESS_TOKEN_SECRET, { expiresIn: '2h' }); // Access token expires in 1 hour
+        const accessToken = jwt.sign({ payload }, ACCESS_TOKEN_SECRET, {
+          expiresIn: "2h",
+        }); // Access token expires in 1 hour
         const refreshToken = ACCESS_TOKEN_SECRET;
-        
-        res.send({ message: 'Login successful', accessToken, refreshToken });
 
+        res.send({ message: "Login successful", accessToken, refreshToken });
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Internal server error" });
       }
     });
 
-    app.post('/refresh', async (req, res) => {
+    app.post("/refresh", async (req, res) => {
       try {
         let refreshToken = req.body.refreshToken;
         const accessToken = req.body.accessToken;
 
-
         if (!refreshToken) {
-          return res.status(400).send({ message: 'Missing refresh token' });
+          return res.status(400).send({ message: "Missing refresh token" });
         }
-
 
         // Generate new access token
         const decodedRefreshToken = jwt.verify(accessToken, refreshToken);
         const userId = decodedRefreshToken.userId;
         const Job = decodedRefreshToken.Job;
         refreshToken = generateRefreshToken();
-        const newAccessToken = jwt.sign({ userId, Job }, refreshToken, { expiresIn: '2h' });
+        const newAccessToken = jwt.sign({ userId, Job }, refreshToken, {
+          expiresIn: "2h",
+        });
 
-        res.send({ message: 'Refresh successful', accessToken: newAccessToken, refreshToken });
+        res.send({
+          message: "Refresh successful",
+          accessToken: newAccessToken,
+          refreshToken,
+        });
       } catch (error) {
         console.error(error);
-        res.status(500).send({ message: 'Internal server error' });
+        res.status(500).send({ message: "Internal server error" });
       }
     });
-
-
 
     let resetCode;
     app.post("/forget", async (req, res) => {
@@ -277,11 +297,24 @@ module.exports = {
       }
     });
     // add new employee or doctor
-    app.post('/addEmployee', async (req, res) => {
+    app.post("/addEmployee", async (req, res) => {
       try {
-        const { fname, lname, sex, email, phone, birthDate, address, password, jobTitle } = req.body;
+        const {
+          fname,
+          lname,
+          sex,
+          email,
+          phone,
+          birthDate,
+          address,
+          password,
+          jobTitle,
+        } = req.body;
+        let confirmEmail = true;
 
-        let employeeInfo, employeeData, salaryPercentage = 0;
+        let employeeInfo,
+          employeeData,
+          salaryPercentage = 0;
         employeeData = [
           fname,
           lname,
@@ -293,40 +326,68 @@ module.exports = {
           password,
           salaryPercentage,
           jobTitle,
-        ]
+        ];
+       // check if email is valid
+        let Email = email.toLowerCase();
+        if (!Email.includes("@gmail.com")) {
+          return res
+          .status(400)
+          .send({
+            message:
+              "Please check the email address entered and try again. it must be as follows: *******@gmail.com ",
+          });
+          
+        }
+       
+        // Check if the email already exists in the 'doctor' or 'employee' tables
+const [emailResults] = await pool.query(`
+SELECT * 
+FROM (
+  SELECT * FROM doctor WHERE email = ?
+  UNION
+  SELECT * FROM employee WHERE email = ?
+) AS combined
+`, [email, email]);
+
+if (emailResults.length > 0) {
+return res.status(400).send({ message: 'Email already exists' });
+}
+
         switch (jobTitle) {
-          case 'Dr':
-            employeeInfo = 'INSERT INTO doctor (fname, lname, sex, email, phone, birthdate, address, password, percentage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
+          case "Dr":
+            employeeInfo =
+              "INSERT INTO doctor (fname, lname, sex, email, phone, birthdate, address, password, percentage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             salaryPercentage = parseFloat(req.body.salaryPercentage) || 0.0;
             employeeData.slice(0, -1);
             break;
-          case 'admin':
-          case 'reception':
-            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, salary, job_title) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+          case "admin":
+          case "reception":
+            employeeInfo =
+              "INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, salary, job_title) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             salaryPercentage = parseInt(req.body.salaryPercentage) || 0;
             break;
-          case 'other':
+          case "other":
             const job = req.body.job;
-            employeeInfo = 'INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, salary, job_title) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            employeeInfo =
+              "INSERT INTO employee (fname, lname, sex, email, phone, birthdate, address, password, salary, job_title) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             salaryPercentage = parseInt(req.body.salaryPercentage) || 0;
             jobTitle = job;
             break;
           default:
-            return res.status(400).send({ message: 'Invalid job title' });
+            return res.status(400).send({ message: "Invalid job title" });
         }
 
         const [results] = await pool.query(employeeInfo, employeeData);
 
         if (results.affectedRows) {
-          res.send({ message: 'Employee added successfully' });
+          res.send({ message: "Employee added successfully" });
         } else {
-          res.status(500).send({ message: 'Failed to add employee' });
+          res.status(500).send({ message: "Failed to add employee" });
         }
       } catch (error) {
         console.error(error);
-        res.status(500).send({ message: 'Internal server error' });
+        res.status(500).send({ message: "Internal server error" });
       }
     });
-
   },
 };
