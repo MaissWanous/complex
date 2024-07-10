@@ -8,7 +8,7 @@ module.exports = {
         host: "localhost",
         user: "root",
         password: "1234",
-        database: "project",
+        database: "complex",
       })
       .promise();
 
@@ -257,19 +257,30 @@ module.exports = {
         res.status(500).send({ message: "Internal server error" });
       }
     });
-
-    app.get("/userProfile", verifyJWT, async (req, res) => {
+    let ID, Role;
+    app.post('/userProfile', (req, res) => {
       try {
-        const userId = req.userId; // Use userId and job from verified token
-        const job = req.job;
-        const table = job;
-        const isDoctor = job === "doctor" ? 1 : 0;
+        ID = req.body.ID;
+        Role = req.body.job;
+        if (!ID || !Email)
+          return res.status(400).send({
+            message: "Missing required fields: email, ID",
+          });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Internal server error" });
+      }
+    })
 
+    app.get("/userProfile", async (req, res) => {
+      try {
+        let table = Role === "doctor" ? "doctor" : (Role === "patient" ? "patient" : "employee");
+        let isDoctor = table === "doctor" ? 1 : 0
         const [userInfo, userPayment] = await Promise.all([
-          pool.query("SELECT * FROM ?? WHERE id = ?", [table, userId]),
+          pool.query("SELECT * FROM ?? WHERE id = ?", [table, ID]),
           pool.query(
             "SELECT * FROM salaries WHERE user_id = ? AND is_doctor = ?",
-            [userId, isDoctor]
+            [ID, isDoctor]
           ),
         ]);
 
@@ -327,20 +338,20 @@ module.exports = {
           salaryPercentage,
           jobTitle,
         ];
-       // check if email is valid
+        // check if email is valid
         let Email = email.toLowerCase();
         if (!Email.includes("@gmail.com")) {
           return res
-          .status(400)
-          .send({
-            message:
-              "Please check the email address entered and try again. it must be as follows: *******@gmail.com ",
-          });
-          
+            .status(400)
+            .send({
+              message:
+                "Please check the email address entered and try again. it must be as follows: *******@gmail.com ",
+            });
+
         }
-       
+
         // Check if the email already exists in the 'doctor' or 'employee' tables
-const [emailResults] = await pool.query(`
+        const [emailResults] = await pool.query(`
 SELECT * 
 FROM (
   SELECT * FROM doctor WHERE email = ?
@@ -349,9 +360,9 @@ FROM (
 ) AS combined
 `, [email, email]);
 
-if (emailResults.length > 0) {
-return res.status(400).send({ message: 'Email already exists' });
-}
+        if (emailResults.length > 0) {
+          return res.status(400).send({ message: 'Email already exists' });
+        }
 
         switch (jobTitle) {
           case "Dr":
