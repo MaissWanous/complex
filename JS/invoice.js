@@ -93,25 +93,19 @@ module.exports = {
     app.delete("/invoice/:id/:date", async (req, res) => {
       const labId = req.params.id;
       const date = req.params.date;
-      console.log(`Deleting invoice: labId=${labId}, date=${date}`); // Improved logging
-
       try {
-        // Use a transaction to ensure data consistency
-        await pool.query("BEGIN");
 
         // Fetch invoice details to validate existence and get item amounts
         const invoice = await pool.query(
           "SELECT item_id, amount FROM invoice WHERE lab_id = ? AND date = ?",
           [parseInt(labId), date]
         );
-        console.log(invoice)
-
         if (invoice[0].length === 0) {
           throw new Error("Invoice not found"); // Handle non-existent invoice
         }
-
         // Delete the invoice
-        await pool.query("DELETE FROM invoice WHERE lab_id = ? AND date = ?", [parseInt(labId), date]);
+        await pool.query("DELETE  FROM invoice WHERE lab_id = ? AND date = ?", [parseInt(labId), date]);
+
 
         // Update item amounts
         const updatePromises = invoice[0].map(async (item) => {
@@ -123,15 +117,44 @@ module.exports = {
 
         await Promise.all(updatePromises); // Execute item updates in parallel
 
-        await pool.query("COMMIT"); // Commit the transaction
+
         res.send("Invoice deleted successfully");
       } catch (err) {
         console.error(err);
-        await pool.query("ROLLBACK"); // Roll back on errors
         res.status(500).send("Error deleting invoice");
       }
     });
 
+    //delete item from invoice
+    app.delete("/item/:lab_id/:date/:item_id", async (req, res) => {
+
+      const labId = req.params.lab_id;
+      const date = req.params.date;
+      const item_id = req.params.item_id;
+      try {
+        // Fetch invoice details to validate existence and get item amounts
+        const item = await pool.query(
+          "SELECT  amount FROM invoice WHERE lab_id = ? AND date = ?And item_id = ?",
+          [parseInt(labId), date, parseInt(item_id)]
+        );
+        if (item[0].length === 0) {
+          throw new Error("Item not found"); // Handle non-existent item
+        }
+        // Delete the item
+        await pool.query("DELETE  FROM invoice WHERE lab_id = ? AND date = ? and item_id = ?", [parseInt(labId), date, parseInt(item_id)]);
+        // Update item amounts
+        await pool.query("UPDATE items SET amount = amount - ? WHERE item_id = ?", [
+          parseInt(item[0][0].amount),
+          parseInt(item_id),
+        ]);
+
+
+        res.send("Item deleted successfully");
+      } catch (err) {
+        console.error(err);
+        res.status(500).send("Error deleting item");
+      }
+    })
 
     //Get info about invoice and items
     app.get("/invoiceInfo", async (req, res) => {
@@ -158,7 +181,6 @@ module.exports = {
         res.status(500).send("Error retrieving invoice data"); // Handle errors gracefully
       }
     });
-
 
   }
 }

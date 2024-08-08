@@ -44,6 +44,14 @@ import('./JS/invoice.js')
   .catch((err) => {
     console.error(err);
   });
+// Import and use finance module
+  import('./JS/finance.js')
+  .then((finance) => {
+    finance.finance(app, __dirname);
+  })
+  .catch((err) => {
+    console.error(err);
+  });
 
 // Import and use patient module
 import('./JS/patient.js')

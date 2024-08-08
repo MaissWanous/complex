@@ -96,6 +96,7 @@ module.exports = {
           Job,
           email,
         ]);
+      
         if (!user[0].length) {
           return res.status(401).send({ message: "Invalid email " });
         }
@@ -108,7 +109,7 @@ module.exports = {
           return res.status(401).send({ message: "Incorrect password" });
         }
         // Successful login: Generate JWT
-        const payload = { userId: user[0].ID, Job }; // Include relevant user data in the payload
+        const payload = { userId: user[0][0].ID, Job }; // Include relevant user data in the payload
         const accessToken = jwt.sign({ payload }, ACCESS_TOKEN_SECRET, {
           expiresIn: "2h",
         }); // Access token expires in 1 hour
