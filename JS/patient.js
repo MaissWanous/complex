@@ -178,15 +178,32 @@ module.exports = {
     // add new patient 
     app.post('/addPatient', async (req, res) => {
       try {
-        const { patientId, fname, lname, phone, sex, birthdate, address } = req.body;
+        const { fname, lname, email, phone, sex, birthdate, address } = req.body;
+        let Email = email.toLowerCase();
+        if (!Email.includes("@gmail.com")) {
+          return res
+            .status(400)
+            .send({
+              message:
+                "Please check the email address entered and try again. it must be as follows: *******@gmail.com ",
+            });
 
-        // Basic validation (optional, add more as needed)
-        if (!patientId || !fname || !lname || !phone) {
+        }
+        // Check if the email already exists in the 'doctor' or 'employee' tables
+        const [emailResults] = await pool.query(`
+            SELECT * FROM patient WHERE email = ?
+          `, [email]);
+
+        if (emailResults.length > 0) {
+          return res.status(400).send({ message: 'Email already exists' });
+        }
+        //Basic validation (optional, add more as needed)
+        if (!fname || !lname || !phone) {
           return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        const sql = `INSERT INTO patient (id, fname, lname, phone, sex, birthdate, address) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-        await pool.query(sql, [patientId, fname, lname, phone, sex, birthdate, address]);
+        const sql = `INSERT INTO patient (fname, lname,Email, phone, sex, birthdate, address) VALUES ( ?, ?, ?, ?, ?, ?,?)`;
+        await pool.query(sql, [fname, lname, email, phone, sex, birthdate, address]);
 
         res.status(201).json({ message: 'Patient added successfully' });
       } catch (error) {
@@ -194,6 +211,35 @@ module.exports = {
         res.status(500).json({ message: 'Internal server error' }); // Informative error message
       }
     });
+    //add treatment for patient
+    app.post("/addTreatmentPaitent", async function (req, res) {
+      try {
+        const { doctor_id, patient_id, treatment_id, tooth, date, note } = req.body;
+        await pool.query(
+          "INSERT INTO treatment_info (doctor_id, patient_id, treatment_id , tooth , date, note) VALUES (?,?, ?, ?, ?, ?)",
+          [parseInt(doctor_id), parseInt(patient_id), parseInt(treatment_id), tooth, date, note]
+        );
+        res.send("successfully added treatment for patient")
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error' }); // Informative error message
+      }
+    })
+    // paid cost treatment for patient
+    app.post("/payPatint", async function (req, res) {
+      try {
+        const { doctor_id, patient_id, treatment_id } = req.body;
+        await pool.query("update treatment_info set ispaid = 1 where patint_id=? and doctor_id=? and treatment_id=?",
+           ([patient_id, doctor_id, treatment_id])
+        )
+        res.send("paid")
+      }
+      catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error' }); // Informative error message
+      }
+    })
     //get treatment info for patient
     app.get("/treatmentInfo", function (req, res) {
       try {
@@ -208,5 +254,6 @@ module.exports = {
         res.status(500).json({ message: "Internal server error" });
       }
     });
+
   },
 };

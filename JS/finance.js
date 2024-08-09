@@ -81,6 +81,82 @@ module.exports = {
                 res.status(500).send("Error adding expenses ");
             }
         })
+        app.post("/DetectionDrs", async (req, res) => {
+            try {
+                // Extract date components from the request body
+                const { day, month, year } = req.body;
+
+                // Build the SQL query dynamically based on the provided date components
+                let sql = 'SELECT COUNT(*) AS total_patients FROM treatment_info WHERE ';
+                let whereClause = [];
+
+                // Add WHERE clauses for year, month, and day if they are provided
+                if (year) {
+                    whereClause.push(`YEAR(date) = ${year}`);
+                }
+                if (month) {
+                    whereClause.push(`MONTH(date) = ${month}`);
+                }
+                if (day) {
+                    whereClause.push(`DAY(date) = ${day}`);
+                }
+
+                // Combine the WHERE clauses and append them to the SQL query
+                sql += whereClause.join(' AND ');
+
+                // Execute the SQL query and get the results
+                const [rows] = await pool.query(sql);
+
+                // Send the total number of patients as a JSON response
+                res.json({ total_patients: rows[0].total_patients });
+
+            } catch (error) {
+                // Log the error and send a generic error message
+                console.error(error);
+                res.status(500).send("Error fetching patient count");
+            }
+        });
+        app.post("/paySalary", async (req, res) => {
+            try {
+                // Extract and validate data from request body
+                const { id, amount, month, date, note, isDoctor } = req.body;
+
+                // Validate input data types (consider using a library like Joi for more robust validation)
+                if (
+                    !Number.isInteger(id) ||
+                    !Number.isInteger(amount) ||
+                    !Number.isInteger(month) ||
+                    !Number.isInteger(isDoctor) ||
+                    typeof date !== "string" ||
+                    typeof note !== "string"
+                ) {
+                    return res.status(400).send("Invalid data types in request body");
+                }
+
+                // Construct a prepared SQL statement to prevent SQL injection vulnerabilities
+                const sql = `
+                INSERT INTO salaries (user_id, amount, month, date, note, is_doctor)
+                VALUES (?, ?, ?, ?, ?, ?)
+              `;
+
+                // Execute the prepared statement with sanitized values
+                const [result] = await pool.query(sql, [id, amount, month, date, note, isDoctor]);
+
+                // Handle successful insertion
+                if (result.affectedRows === 1) {
+                    res.json({ message: "Salary payment recorded successfully" });
+                } else {
+                    console.error("Unexpected result from database insertion:", result);
+                    res.status(500).send("Error recording salary payment");
+                }
+
+            } catch (error) {
+                console.error("Error processing salary payment:", error);
+                res.status(500).send("Internal server error"); // Generic error message for security
+            }
+        });
+
+
 
     }
 }
