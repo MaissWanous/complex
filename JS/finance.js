@@ -68,6 +68,47 @@ module.exports = {
                 res.status(500).send("Error adding expenses");
             }
         })
+        app.post("/profit", async (req, res) => {
+            try {
+                // Extract date components from the request body
+                const { day, month, year } = req.body;
+
+                // Build the base SQL queries
+                let salaries = 'SELECT SUM(amount) AS total_salary FROM salaries where ';
+                let percentage =
+                    'select ID,avg(percentage) , sum(cost),sum( profit) from treatment_info inner join doctor on ID = doctor_id INNER JOIN treatment ON treatment.treatment_id = treatment_info.treatment_id  where '
+                let whereClause = [];
+                // Add WHERE clauses for year, month, and day if they are provided
+                if (year) {
+                    whereClause.push(`YEAR(date) = ${year}`);
+                }
+                if (month) {
+                    whereClause.push(`MONTH(date) = ${month}`);
+                }
+                if (day) {
+                    whereClause.push(`DAY(date) = ${day}`);
+                }
+
+                // Combine the WHERE clauses and append them to the SQL query
+                salaries += whereClause.join(' AND ');
+                percentage += whereClause.join(' AND ');
+                percentage += " group by(ID)"
+
+                // Execute the SQL query and get the results
+                // const [expensesRows] = await pool.query(expenses);
+                const [salariesRows] = await pool.query(salaries);
+                const [percentageRows] = await pool.query(percentage);
+                console.log(percentageRows)
+
+                res.send(";;")
+
+            } catch (error) {
+                console.error("Error calculating total profit:", error);
+                res.status(500).send("Internal server error");
+            }
+        });
+
+
         app.get("/expenses", async function (req, res) {
             try {
 
