@@ -227,7 +227,7 @@ module.exports = {
       }
     })
     // paid cost treatment for patient
-    app.post("/payPatint", async function (req, res) {
+    app.post("/payPatient", async function (req, res) {
       try {
         const { doctor_id, patient_id, treatment_id } = req.body;
         await pool.query("update treatment_info set ispaid = 1 where patint_id=? and doctor_id=? and treatment_id=?",

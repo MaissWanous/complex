@@ -353,12 +353,12 @@ module.exports = {
 
         // Check if the email already exists in the 'doctor' or 'employee' tables
         const [emailResults] = await pool.query(`
-SELECT * 
-FROM (
-  SELECT * FROM doctor WHERE email = ?
-  UNION
-  SELECT * FROM employee WHERE email = ?
-) AS combined
+      SELECT * 
+     FROM (
+    SELECT * FROM doctor WHERE email = ?
+   UNION
+   SELECT * FROM employee WHERE email = ?
+    ) AS combined
 `, [email, email]);
 
         if (emailResults.length > 0) {

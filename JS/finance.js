@@ -1,3 +1,4 @@
+const { forEach } = require("lodash");
 const mysql = require("mysql2");
 module.exports = {
     finance: function (app, dic) {
@@ -42,12 +43,11 @@ module.exports = {
         })
         app.post("/addExpenses", async function (req, res) {
             try {
-                let { object, type, amount, For, check, date, cost, note } = req.body;
-                check = '0' ? "y" : "m";
+                let { object, type, amount, date, cost, note } = req.body;
                 let medicine;
                 await pool.query(
-                    "INSERT INTO expenses (object,type,amount,Forr,yearlyMonthly,date,cost,note) VALUES (?,?,?,?, ?,?,?,?)",
-                    [object, type, parseInt(amount), parseInt(For), check, date, parseInt(cost), note]
+                    "INSERT INTO expenses (object,type,amount,date,cost,note) VALUES (?,?,?,?,?,?)",
+                    [object, type, parseInt(amount), date, parseInt(cost), note]
                 );
                 if (type == "medicine") {
                     // Update item amounts
@@ -68,6 +68,10 @@ module.exports = {
                 res.status(500).send("Error adding expenses");
             }
         })
+        let expensesRows = [];
+        let salariesRows = [];
+        let invoiceRows = [];
+        let calculatProfit = [];
         app.post("/profit", async (req, res) => {
             try {
                 // Extract date components from the request body
@@ -76,7 +80,9 @@ module.exports = {
                 // Build the base SQL queries
                 let salaries = 'SELECT SUM(amount) AS total_salary FROM salaries where ';
                 let percentage =
-                    'select ID,avg(percentage) , sum(cost),sum( profit) from treatment_info inner join doctor on ID = doctor_id INNER JOIN treatment ON treatment.treatment_id = treatment_info.treatment_id  where '
+                    'select ID,avg(percentage) as perc , sum(cost) as cost,sum( profit) as profit from treatment_info inner join doctor on ID = doctor_id INNER JOIN treatment ON treatment.treatment_id = treatment_info.treatment_id  where '
+                let invoice = 'select lab_id , date , sum(piece_cost) as totalPrice from invoice where '
+                let expenses = 'select * from expenses where '
                 let whereClause = [];
                 // Add WHERE clauses for year, month, and day if they are provided
                 if (year) {
@@ -92,15 +98,25 @@ module.exports = {
                 // Combine the WHERE clauses and append them to the SQL query
                 salaries += whereClause.join(' AND ');
                 percentage += whereClause.join(' AND ');
+                expenses += whereClause.join(' AND ');
                 percentage += " group by(ID)"
+                invoice += whereClause.join(' AND ');
+                invoice += " group by lab_id, date"
 
                 // Execute the SQL query and get the results
-                // const [expensesRows] = await pool.query(expenses);
-                const [salariesRows] = await pool.query(salaries);
+                expensesRows = await pool.query(expenses);
+                salariesRows = await pool.query(salaries);
                 const [percentageRows] = await pool.query(percentage);
-                console.log(percentageRows)
-
-                res.send(";;")
+                invoiceRows = await pool.query(invoice);
+                percentageRows.forEach(item => {
+                    calculatProfit.push({
+                        ID: item.ID,
+                        DoctorShar: item.perc * parseInt(item.profit) / 100,
+                        total_cost: parseInt(item.cost),
+                        total_profit: parseInt(item.profit)
+                    });
+                });
+                res.send("calculate")
 
             } catch (error) {
                 console.error("Error calculating total profit:", error);
@@ -108,15 +124,15 @@ module.exports = {
             }
         });
 
-
         app.get("/expenses", async function (req, res) {
             try {
 
-                const expenses = await pool.query(
-                    "SELECT * from expenses"
-                );
-
-                res.json({ expenses: expenses[0] })
+                res.json({
+                    expenses: expensesRows[0],
+                    invoice: invoiceRows[0],
+                    salaries: salariesRows[0],
+                    calculatProfit: calculatProfit[0]
+                })
             } catch (error) {
                 console.error(error);
                 res.status(500).send("Error adding expenses ");
