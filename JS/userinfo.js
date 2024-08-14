@@ -263,10 +263,11 @@ module.exports = {
       try {
         ID = req.body.ID;
         Role = req.body.job;
-        if (!ID || !Email)
+        if (!ID || !Role)
           return res.status(400).send({
-            message: "Missing required fields: email, ID",
+            message: "Missing required fields: Role, ID",
           });
+          res.send("success")
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Internal server error" });
