@@ -12,72 +12,6 @@ module.exports = {
       })
       .promise();
 
-    const verifyJWT = async (req, res, next) => {
-      const token = req.headers["authorization"]?.split(" ")[1]; // Extract token from authorization header
-
-      if (!token) {
-        return res.status(401).json({ message: "Missing authorization token" });
-      }
-
-      try {
-        // Attempt to verify the token as an access token
-        const decodedToken = jwt.verify(token, ACCESS_TOKEN_SECRET);
-        req.userId = decodedToken.userId;
-        req.job = decodedToken.job;
-        next();
-      } catch (error) {
-        if (error.name === "TokenExpiredError") {
-          // If access token is expired, attempt to refresh using refresh token
-          const refreshToken = req.body.refreshToken; // Check for refresh token in request body
-
-          if (!refreshToken) {
-            return res
-              .status(401)
-              .json({
-                message: "Access token expired and no refresh token provided",
-              });
-          }
-
-          // Verify refresh token
-          const isRefreshTokenValid = await verifyRefreshToken(refreshToken);
-
-          if (!isRefreshTokenValid) {
-            return res.status(401).json({ message: "Invalid refresh token" });
-          }
-
-          // Generate a new access token using refresh token
-          const decodedRefreshToken = jwt.verify(
-            refreshToken,
-            REFRESH_TOKEN_SECRET
-          );
-          const userId = decodedRefreshToken.userId;
-          const newAccessToken = jwt.sign(
-            { userId, job: req.job },
-            ACCESS_TOKEN_SECRET,
-            { expiresIn: "1h" }
-          );
-
-          res.json({
-            message: "Access token refreshed",
-            accessToken: newAccessToken,
-          });
-          return; // Don't call next() after refresh
-        } else {
-          // Other errors (e.g., invalid token format)
-          return res.status(401).json({ message: "Invalid token" });
-        }
-      }
-    };
-
-    // Environment variables for JWT secrets
-    const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-    // Helper function to generate a random string for refresh tokens
-    function generateRefreshToken() {
-      return (
-        Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15)
-      );
-    }
 
     let Jobb;
     app.post("/login", async (req, res) => {
@@ -108,43 +42,9 @@ module.exports = {
         if (!isPasswordCorrect[0].length) {
           return res.status(401).send({ message: "Incorrect password" });
         }
-        // Successful login: Generate JWT
-        const payload = { userId: user[0][0].ID, Job }; // Include relevant user data in the payload
-        const accessToken = jwt.sign({ payload }, ACCESS_TOKEN_SECRET, {
-          expiresIn: "2h",
-        }); // Access token expires in 1 hour
-        const refreshToken = ACCESS_TOKEN_SECRET;
+      
 
-        res.send({ message: "Login successful", accessToken, refreshToken });
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ message: "Internal server error" });
-      }
-    });
-
-    app.post("/refresh", async (req, res) => {
-      try {
-        let refreshToken = req.body.refreshToken;
-        const accessToken = req.body.accessToken;
-
-        if (!refreshToken) {
-          return res.status(400).send({ message: "Missing refresh token" });
-        }
-
-        // Generate new access token
-        const decodedRefreshToken = jwt.verify(accessToken, refreshToken);
-        const userId = decodedRefreshToken.userId;
-        const Job = decodedRefreshToken.Job;
-        refreshToken = generateRefreshToken();
-        const newAccessToken = jwt.sign({ userId, Job }, refreshToken, {
-          expiresIn: "2h",
-        });
-
-        res.send({
-          message: "Refresh successful",
-          accessToken: newAccessToken,
-          refreshToken,
-        });
+        res.send({ message: "Login successful"});
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Internal server error" });
